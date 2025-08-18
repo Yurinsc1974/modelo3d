@@ -28,7 +28,8 @@
     .kpi .sub { font-size: 12px; color: #aab4cf; }
 
     /* Error banner */
-    .error { position: absolute; top: 16px; right: 16px; background: #3b1b1b; color: #ffd5d5; border: 1px solid #b14a4a; padding: 10px 12px; border-radius: 10px; pointer-events: auto; max-width: 420px; }
+    .error { position: absolute; top: 16px; right: 16px; background: #3b1b1b; color: #ffd5d5; border: 1px solid #b14a4a; padding: 10px 12px; border-radius: 10px; pointer-events: auto; max-width: 520px; }
+    .error small { opacity: .85; }
   </style>
 </head>
 <body>
@@ -76,7 +77,7 @@
   </div>
 
   <script type="module">
-    // ---------- Loader com fallback de CDNs ----------
+    // ---------- Fallback de CDNs ----------
     async function loadThree() {
       const threeURLs = [
         'https://esm.sh/three@0.160.0',
@@ -94,7 +95,6 @@
       }
       throw lastErr;
     }
-
     async function loadSheetJS() {
       const urls = [
         'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
@@ -106,6 +106,7 @@
       throw new Error('Não foi possível carregar a biblioteca de Excel (SheetJS).');
     }
 
+    // ---------- Utilidades ----------
     const REQUIRED_AREAS = ['Dique','Maciço Principal','Miguel Congo','Regreide','Talude 08'];
     const PRESET_COORDS = {
       'Dique': [-20, 0, 0, 5],
@@ -114,205 +115,110 @@
       'Regreide': [-10, 0, 10, 4],
       'Talude 08': [10, 0, 12, 6],
     };
-
     const errBox = document.getElementById('error');
-    function showError(msg){ errBox.style.display='block'; errBox.textContent = msg; }
+    function showError(msg){ errBox.style.display='block'; errBox.innerHTML = msg; }
+    const norm = s => (s==null? '': String(s)).normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().trim();
+
+    async function tryFetchExcel() {
+      const candidates = ['./Base.xlsx','./Base 1.xlsx','./Base1.xlsx','./base.xlsx'];
+      let lastErr; for (const url of candidates){ try { const r = await fetch(url, {cache:'no-store'}); if (r.ok) return await r.arrayBuffer(); lastErr = r.status+':'+url; } catch(e){ lastErr=e; } }
+      throw new Error('Não foi possível baixar a planilha. Coloque <b>Base.xlsx</b> (ou "Base 1.xlsx") na raiz do repositório.');
+    }
+
+    function parseSheetToRows(XLSX, ws){
+      // Lê tudo como matriz (header:1) e detecta a primeira linha de cabeçalho válida (contendo algo como "area")
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+      let headerIdx = -1; let headerRow = null;
+      for (let i=0;i<Math.min(rows.length, 20); i++){
+        const r = rows[i]; if (!r) continue;
+        const normalized = r.map(c=> norm(c));
+        const hasArea = normalized.some(c => c.includes('area'));
+        const coverage = normalized.filter(c=>c).length; // número de células não vazias
+        if (hasArea && coverage>=2){ headerIdx=i; headerRow=r; break; }
+      }
+      if (headerIdx===-1 || !headerRow){ throw new Error('Cabeçalho não encontrado. Certifique-se que a primeira linha com títulos possua uma coluna "Área".'); }
+
+      // Mapeia nomes → índice
+      const headers = headerRow; const map = {}; headers.forEach((h,idx)=>{ map[norm(h)] = idx; });
+      const areaIdx = map['area'] || Object.entries(map).find(([k])=>k.includes('area'))?.[1];
+      const dateIdx = map['data'] || Object.entries(map).find(([k])=>k.includes('data'))?.[1];
+      const realIdx = map['real'] || map['real2'] || Object.entries(map).find(([k])=>k.startsWith('real'))?.[1];
+      const planIdx = map['planejado'] || map['previsto'] || Object.entries(map).find(([k])=>k.includes('planejad')||k.includes('previst'))?.[1];
+      if (areaIdx==null) throw new Error('Coluna "Área" não encontrada na planilha.');
+
+      const out = [];
+      for (let i=headerIdx+1; i<rows.length; i++){
+        const r = rows[i]; if (!r) continue;
+        const area = r[areaIdx]; if (area==null || String(area).trim()==='') continue;
+        const item = {
+          area: String(area).trim(),
+          date: dateIdx!=null ? r[dateIdx] : null,
+          real: realIdx!=null ? (r[realIdx]!=null? Number(r[realIdx]) : null) : null,
+          plan: planIdx!=null ? (r[planIdx]!=null? Number(r[planIdx]) : null) : null,
+        };
+        out.push(item);
+      }
+      return out;
+    }
 
     const { THREE, OrbitControls } = await loadThree();
     const XLSX = await loadSheetJS();
 
-    // ---------- THREE: cena ----------
+    // ---------- THREE ----------
     const canvas = document.getElementById('scene');
     const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b1020);
-    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
-    camera.position.set(45, 30, 45);
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; controls.target.set(0, 4, 0);
-
-    // Luzes e chão
-    scene.add(new THREE.HemisphereLight(0xbfd7ff, 0x0b142a, 1.2));
-    const dir = new THREE.DirectionalLight(0xffffff, 0.9); dir.position.set(30,50,10); dir.castShadow = true; scene.add(dir);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b1020);
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000); camera.position.set(45,30,45);
+    const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.target.set(0,4,0);
+    scene.add(new THREE.HemisphereLight(0xbfd7ff, 0x0b142a, 1.2)); const dir = new THREE.DirectionalLight(0xffffff,0.9); dir.position.set(30,50,10); dir.castShadow=true; scene.add(dir);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(200,200), new THREE.MeshStandardMaterial({color:0x1a203a, roughness:0.95})); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
-    // Água
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(140,90), new THREE.MeshPhysicalMaterial({color:0x2c6fff, roughness:0.2, transmission:0.75, opacity:0.75, transparent:true}));
-    water.rotation.x=-Math.PI/2; water.position.set(-10, 0.05, -10); scene.add(water);
-    // Barragem
-    const dam = new THREE.Group();
-    const damBody = new THREE.Mesh(new THREE.BoxGeometry(60,12,20), new THREE.MeshStandardMaterial({color:0x6b6f7a})); damBody.position.set(10,6,0); damBody.rotation.z = THREE.MathUtils.degToRad(-10); damBody.castShadow=true; damBody.receiveShadow=true; dam.add(damBody);
-    const crest = new THREE.Mesh(new THREE.BoxGeometry(60,2,6), new THREE.MeshStandardMaterial({color:0x9aa0a6})); crest.position.set(10,12.5,0); dam.add(crest); scene.add(dam);
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(140,90), new THREE.MeshPhysicalMaterial({color:0x2c6fff, roughness:0.2, transmission:0.75, opacity:0.75, transparent:true})); water.rotation.x=-Math.PI/2; water.position.set(-10,0.05,-10); scene.add(water);
+    const dam = new THREE.Group(); const damBody = new THREE.Mesh(new THREE.BoxGeometry(60,12,20), new THREE.MeshStandardMaterial({color:0x6b6f7a})); damBody.position.set(10,6,0); damBody.rotation.z=THREE.MathUtils.degToRad(-10); damBody.castShadow=true; damBody.receiveShadow=true; dam.add(damBody); const crest = new THREE.Mesh(new THREE.BoxGeometry(60,2,6), new THREE.MeshStandardMaterial({color:0x9aa0a6})); crest.position.set(10,12.5,0); dam.add(crest); scene.add(dam);
 
-    // ---------- UI e helpers ----------
-    const areaSelect = document.getElementById('areaSelect');
-    const dateSelect = document.getElementById('dateSelect');
-    const tooltip = document.getElementById('tooltip');
+    // ---------- UI ----------
+    const areaSelect = document.getElementById('areaSelect'); const dateSelect = document.getElementById('dateSelect'); const tooltip = document.getElementById('tooltip');
+    const kpiRatio = document.getElementById('kpiRatio'); const kpiReal = document.getElementById('kpiReal'); const kpiPlan = document.getElementById('kpiPlan');
+    const markers = new THREE.Group(); scene.add(markers); const sphereGeo = new THREE.SphereGeometry(1.2,32,16);
 
-    const kpiRatio = document.getElementById('kpiRatio');
-    const kpiReal  = document.getElementById('kpiReal');
-    const kpiPlan  = document.getElementById('kpiPlan');
+    function colorFromRatio(r){ if (r==null||!isFinite(r)) return new THREE.Color(0x95a5a6); const t=(Math.max(0.7,Math.min(1.3,r))-0.7)/0.6; const c=new THREE.Color(); c.setHSL(0.0+t*0.33,0.85,0.5); return c; }
+    function parseDate(v){ const d=new Date(v); return isNaN(d)? null : d; }
+    function fmt(v,digits=2){ return (v==null||!isFinite(v))? 'n/d' : (typeof v==='number'? v.toFixed(digits) : String(v)); }
 
-    const markers = new THREE.Group(); scene.add(markers);
-    const sphereGeo = new THREE.SphereGeometry(1.2, 32, 16);
-
-    function colorFromRatio(r){ if (r==null||!isFinite(r)) return new THREE.Color(0x95a5a6); const t = (Math.max(0.7, Math.min(1.3, r)) - 0.7) / 0.6; const c = new THREE.Color(); c.setHSL(0.0 + t*0.33, 0.85, 0.5); return c; }
-
-    function parseDate(v){ const d = new Date(v); return isNaN(d) ? null : d; }
-    function fmt(v, digits=2){ return (v==null||!isFinite(v)) ? 'n/d' : (typeof v==='number' ? v.toFixed(digits) : String(v)); }
-
-    // Carregar Excel
     let ROWS = [];
-    async function loadExcel() {
-      const res = await fetch('./Base.xlsx');
-      if (!res.ok) throw new Error('Não foi possível baixar ./Base.xlsx');
-      const buf = await res.arrayBuffer();
-      const wb = XLSX.read(buf, {type:'array'});
-      const wsName = wb.SheetNames[0];
-      const ws = wb.Sheets[wsName];
-      const json = XLSX.utils.sheet_to_json(ws, {defval:null});
+    try {
+      const buf = await tryFetchExcel();
+      const wb = XLSX.read(buf, {type:'array'}); const ws = wb.Sheets[wb.SheetNames[0]]; if (!ws) throw new Error('Planilha vazia.');
+      ROWS = parseSheetToRows(XLSX, ws);
+    } catch(e){ console.error(e); showError(e.message + '<br><small>Dica: garanta que o arquivo se chame <b>Base.xlsx</b> (ou "Base 1.xlsx") e que a linha de cabeçalho contenha uma coluna "Área". Primeira planilha do arquivo deve ter os dados.</small>'); }
 
-      // Normalizar nomes de colunas (sem acentos e minúsculo)
-      const norm = s => (s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().trim();
+    // Garantir as 5 áreas
+    for (const a of REQUIRED_AREAS){ if (!ROWS.some(x=> norm(x.area)===norm(a))) ROWS.push({area:a, date:null, real:null, plan:null}); }
 
-      // Mapear colunas prováveis
-      // área, data, real/real2, planejado/previsto
-      const cols = Object.keys(json[0]||{});
-      const normMap = { }; for (const c of cols) normMap[norm(c)] = c;
-      const areaCol = normMap['area'] || Object.entries(normMap).find(([k])=>k.includes('area'))?.[1];
-      const dateCol = normMap['data'] || Object.entries(normMap).find(([k])=>k.includes('data'))?.[1];
-      const realCol = normMap['real'] || normMap['real2'] || Object.entries(normMap).find(([k])=>k.startsWith('real'))?.[1];
-      const planCol = normMap['planejado'] || normMap['previsto'] || Object.entries(normMap).find(([k])=>k.includes('planejad')||k.includes('previst'))?.[1];
+    function getUniqueDates(){ const ds=new Set(); for (const r of ROWS){ if (r.date){ const d=parseDate(r.date); if (d) ds.add(d.toISOString().slice(0,10)); } } return Array.from(ds).sort(); }
+    function getUniqueAreas(){ const as=new Set(REQUIRED_AREAS); for(const r of ROWS) if(r.area) as.add(r.area); return Array.from(as); }
 
-      if (!areaCol) throw new Error('Coluna "Área" não encontrada na planilha.');
+    function buildSelectors(){ const dates=getUniqueDates(); dateSelect.innerHTML='<option value="Todos">Todos</option>'+dates.map(d=>`<option value="${d}">${d}</option>`).join(''); const areas=getUniqueAreas(); areaSelect.innerHTML='<option value="Todos">Todos</option>'+areas.map(a=>`<option value="${a}">${a}</option>`).join(''); }
 
-      ROWS = json.map(r => ({
-        area: String(r[areaCol]).trim(),
-        date: dateCol ? r[dateCol] : null,
-        real: realCol!=null ? (r[realCol]!=null? Number(r[realCol]) : null) : null,
-        plan: planCol!=null ? (r[planCol]!=null? Number(r[planCol]) : null) : null,
-      }));
+    function aggregateForDate(selDate){ const byArea=new Map(); for(const r of ROWS){ const rDate=r.date?parseDate(r.date):null; if(selDate!=='Todos' && rDate && rDate.toISOString().slice(0,10)!==selDate) continue; const key=r.area||'Área'; const prev=byArea.get(key); if(!prev) byArea.set(key,r); else { const pd=prev.date?parseDate(prev.date):null; const rd=rDate; if(!pd && rd) byArea.set(key,r); else if(pd && rd && rd>pd) byArea.set(key,r);} } for(const a of REQUIRED_AREAS){ if(!byArea.has(a)) byArea.set(a,{area:a,date:null,real:null,plan:null}); } return Array.from(byArea.values()); }
 
-      // Preencher ao menos as 5 áreas obrigatórias com placeholders (se não existirem em nenhuma linha)
-      for (const a of REQUIRED_AREAS) {
-        if (!ROWS.some(x => (x.area||'').toLowerCase() === a.toLowerCase())) ROWS.push({area:a, date:null, real:null, plan:null});
-      }
-    }
+    function updateKPI(rows){ const vals=rows.map(r=>({real:r.real, plan:r.plan, ratio:(r.real!=null&&r.plan)?(r.plan!==0? r.real/r.plan:null):null})); const mean=(arr)=>{ const v=arr.filter(x=>x!=null&&isFinite(x)); return v.length? (v.reduce((a,b)=>a+b,0)/v.length):null;}; kpiRatio.textContent=fmt(mean(vals.map(v=>v.ratio))); kpiReal.textContent=fmt(mean(vals.map(v=>v.real))); kpiPlan.textContent=fmt(mean(vals.map(v=>v.plan))); }
 
-    function getUniqueDates(){ const ds = new Set(); for (const r of ROWS){ if (r.date){ const d = parseDate(r.date); if (d) ds.add(d.toISOString().slice(0,10)); } } return Array.from(ds).sort(); }
-    function getUniqueAreas(){ const as = new Set(REQUIRED_AREAS); for (const r of ROWS) if (r.area) as.add(r.area); return Array.from(as); }
+    const areaToObject=new Map();
+    function buildMarkers(selDate='Todos', selArea='Todos'){ while(markers.children.length) markers.remove(markers.children[0]); areaToObject.clear(); const rows=aggregateForDate(selDate).filter(r=> selArea==='Todos'? true : r.area===selArea); for(const d of rows){ const coords=PRESET_COORDS[d.area] || [0,0,0,5]; const [x,y,z,h]=coords; const ratio=(d.real!=null&&d.plan)?(d.plan!==0? d.real/d.plan:null):null; const mat=new THREE.MeshStandardMaterial({color: colorFromRatio(ratio), roughness:0.4}); const mesh=new THREE.Mesh(sphereGeo, mat); mesh.position.set(x,h,z); mesh.castShadow=true; mesh.userData={...d, ratio, height:h}; const ped=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,h,12), new THREE.MeshStandardMaterial({color:0x3a466f, roughness:0.9})); ped.position.set(x,h/2,z); ped.castShadow=true; ped.receiveShadow=true; markers.add(ped); markers.add(mesh); areaToObject.set(d.area, mesh);} updateKPI(rows); }
 
-    function buildSelectors(){
-      // Datas
-      const dates = getUniqueDates();
-      dateSelect.innerHTML = '<option value="Todos">Todos</option>' + dates.map(d=>`<option value="${d}">${d}</option>`).join('');
-      // Áreas
-      const areas = getUniqueAreas();
-      areaSelect.innerHTML = '<option value="Todos">Todos</option>' + areas.map(a=>`<option value="${a}">${a}</option>`).join('');
-    }
-
-    function filterRows(selDate, selArea){
-      return ROWS.filter(r=>{
-        const okDate = (selDate==='Todos') || (!!r.date && (new Date(r.date)).toISOString().slice(0,10)===selDate);
-        const okArea = (selArea==='Todos') || (r.area===selArea);
-        return okDate && okArea;
-      });
-    }
-
-    function aggregateForDate(selDate){
-      // Para exibir 1 ponto por área: selecionar, para cada área, a linha mais recente até a data sel/qualquer
-      const byArea = new Map();
-      for (const r of ROWS){
-        const rDate = r.date ? parseDate(r.date) : null;
-        if (selDate!=='Todos' && rDate && rDate.toISOString().slice(0,10)!==selDate) continue;
-        const key = r.area || 'Área';
-        const prev = byArea.get(key);
-        if (!prev) byArea.set(key, r);
-        else {
-          const pd = prev.date ? parseDate(prev.date) : null; const rd = rDate;
-          if (!pd && rd) byArea.set(key, r);
-          else if (pd && rd && rd>pd) byArea.set(key, r);
-        }
-      }
-      // garantir as 5 áreas
-      for (const a of REQUIRED_AREAS){ if (!byArea.has(a)) byArea.set(a, {area:a, date:null, real:null, plan:null}); }
-      return Array.from(byArea.values());
-    }
-
-    function updateKPI(rows){
-      const vals = rows.map(r=>({real:r.real, plan:r.plan, ratio: (r.real!=null && r.plan)? (r.plan!==0? r.real/r.plan : null) : null}));
-      const mean = (arr)=>{ const v = arr.filter(x=>x!=null && isFinite(x)); return v.length? (v.reduce((a,b)=>a+b,0)/v.length) : null; };
-      kpiRatio.textContent = fmt(mean(vals.map(v=>v.ratio)));
-      kpiReal.textContent  = fmt(mean(vals.map(v=>v.real)));
-      kpiPlan.textContent  = fmt(mean(vals.map(v=>v.plan)));
-    }
-
-    const areaToObject = new Map();
-
-    function buildMarkers(selDate='Todos', selArea='Todos'){
-      while (markers.children.length) markers.remove(markers.children[0]);
-      areaToObject.clear();
-
-      const rows = aggregateForDate(selDate).filter(r=> selArea==='Todos' ? true : r.area===selArea);
-
-      for (const d of rows){
-        const coords = PRESET_COORDS[d.area] || [0,0,0,5];
-        const [x,y,z,h] = coords;
-        const ratio = (d.real!=null && d.plan)? (d.plan!==0? d.real/d.plan:null) : null;
-        const mat = new THREE.MeshStandardMaterial({color: colorFromRatio(ratio), roughness:0.4});
-        const mesh = new THREE.Mesh(sphereGeo, mat); mesh.position.set(x, h, z); mesh.castShadow=true; mesh.userData={...d, ratio, height:h};
-
-        const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,h,12), new THREE.MeshStandardMaterial({color:0x3a466f, roughness:0.9})); ped.position.set(x,h/2,z); ped.castShadow=true; ped.receiveShadow=true;
-        markers.add(ped); markers.add(mesh);
-        areaToObject.set(d.area, mesh);
-      }
-
-      updateKPI(rows);
-    }
-
-    // Hover tooltip
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    function onPointerMove(e){
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((e.clientX-rect.left)/rect.width)*2 - 1;
-      mouse.y = -((e.clientY-rect.top)/rect.height)*2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(markers.children, true).filter(i=> i.object.geometry===sphereGeo);
-      if (intersects.length){
-        const d = intersects[0].object.userData;
-        tooltip.style.left = e.clientX + 'px'; tooltip.style.top = e.clientY + 'px'; tooltip.style.opacity = 1;
-        const dstr = d.date ? new Date(d.date).toISOString().slice(0,10) : 'n/d';
-        tooltip.innerHTML = `<b>${d.area}</b><br/>Data: ${dstr}<br/>Real: ${fmt(d.real)}<br/>Planejado: ${fmt(d.plan)}<br/>Razão: ${d.ratio? d.ratio.toFixed(2):'n/d'}`;
-      } else tooltip.style.opacity = 0;
-    }
-
+    const raycaster=new THREE.Raycaster(); const mouse=new THREE.Vector2(); function onPointerMove(e){ const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y=-((e.clientY-rect.top)/rect.height)*2+1; raycaster.setFromCamera(mouse, camera); const it=raycaster.intersectObjects(markers.children,true).filter(i=>i.object.geometry===sphereGeo); if(it.length){ const d=it[0].object.userData; tooltip.style.left=e.clientX+'px'; tooltip.style.top=e.clientY+'px'; tooltip.style.opacity=1; const dstr=d.date? new Date(d.date).toISOString().slice(0,10) : 'n/d'; tooltip.innerHTML=`<b>${d.area}</b><br/>Data: ${dstr}<br/>Real: ${fmt(d.real)}<br/>Planejado: ${fmt(d.plan)}<br/>Razão: ${d.ratio? d.ratio.toFixed(2):'n/d'}`; } else tooltip.style.opacity=0; }
     renderer.domElement.addEventListener('pointermove', onPointerMove);
 
-    // Fullscreen
-    document.getElementById('btnFullscreen').addEventListener('click', async ()=>{
-      const el = document.getElementById('app'); if (!document.fullscreenElement){ try { await el.requestFullscreen(); } catch {} } else { await document.exitFullscreen(); }
-    });
+    document.getElementById('btnFullscreen').addEventListener('click', async ()=>{ const el=document.getElementById('app'); if(!document.fullscreenElement){ try{ await el.requestFullscreen(); }catch{} } else { await document.exitFullscreen(); } });
 
-    // Resize & animate
-    function resize(){ const w=window.innerWidth, h=window.innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
-    window.addEventListener('resize', resize); resize();
-    (function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
+    function resize(){ const w=window.innerWidth, h=window.innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); } window.addEventListener('resize', resize); resize(); (function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); })();
 
-    // Selectors
-    areaSelect.addEventListener('change', ()=>{ buildMarkers(dateSelect.value, areaSelect.value); focusCamera(); });
-    dateSelect.addEventListener('change', ()=>{ buildMarkers(dateSelect.value, areaSelect.value); });
+    areaSelect.addEventListener('change', ()=>{ buildMarkers(dateSelect.value, areaSelect.value); focusCamera(); }); dateSelect.addEventListener('change', ()=>{ buildMarkers(dateSelect.value, areaSelect.value); });
+    function focusCamera(){ const val=areaSelect.value; if(val!=='Todos' && areaToObject.has(val)){ const obj=areaToObject.get(val); controls.target.copy(obj.position); camera.position.lerp(new THREE.Vector3(obj.position.x+25, obj.position.y+12, obj.position.z+25), 0.2);} else { controls.target.set(0,4,0); camera.position.set(45,30,45);} }
 
-    function focusCamera(){ const val = areaSelect.value; if (val!=='Todos' && areaToObject.has(val)){ const obj = areaToObject.get(val); controls.target.copy(obj.position); camera.position.lerp(new THREE.Vector3(obj.position.x + 25, obj.position.y + 12, obj.position.z + 25), 0.2);} else { controls.target.set(0,4,0); camera.position.set(45,30,45); } }
-
-    // ---------- Boot ----------
-    try {
-      await loadExcel();
-      buildSelectors();
-      buildMarkers('Todos','Todos');
-    } catch(e){ console.error(e); showError(e.message || String(e)); }
+    buildSelectors(); buildMarkers('Todos','Todos');
   </script>
 </body>
 </html>
-</body>
-</html>
+
