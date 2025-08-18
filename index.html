@@ -1,10 +1,9 @@
-
 <!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dashboard 3D - Barragem (DEMO)</title>
+  <title>Dashboard 3D - Barragem (Exemplo)</title>
   <style>
     html, body { height: 100%; margin: 0; }
     body { background: #0b1020; color: #e6e8ef; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
@@ -21,7 +20,6 @@
     .legend .bar { width: 200px; height: 10px; background: linear-gradient(90deg, #e74c3c, #f1c40f, #2ecc71); border-radius: 6px; margin-top: 6px; }
     .tooltip { position: absolute; padding: 6px 8px; background: rgba(0,0,0,.8); color: #fff; font-size: 12px; border-radius: 6px; transform: translate(-50%, -120%); pointer-events: none; opacity: 0; transition: opacity .15s; }
     .credit { position: absolute; right: 12px; bottom: 12px; color: #8b93a7; font-size: 12px; }
-    .note { position: absolute; top: 16px; right: 16px; background: rgba(10,15,35,.75); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 10px; pointer-events: auto; }
   </style>
 </head>
 <body>
@@ -41,15 +39,39 @@
       </div>
       <div class="tooltip" id="tooltip"></div>
       <div class="credit">Exemplo 3D (Three.js)</div>
-      <div class="note">Esta é a versão DEMO com dados fixos. Para a versão gerada a partir da sua planilha, abra <b>data_from_excel.html</b>.</div>
     </div>
   </div>
 
   <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-    import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    
+  // ---- Loader com fallback de CDNs para Three + OrbitControls ----
+  const threeURLs = [
+    'https://esm.sh/three@0.160.0',
+    'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+    'https://unpkg.com/three@0.160.0/build/three.module.js'
+  ];
+  const controlsURLs = [
+    'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js',
+    'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js?module',
+    'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js?module'
+  ];
+  async function loadThree() {
+    let lastErr;
+    for (let i = 0; i < threeURLs.length; i++) {
+      try {
+        const THREE = await import(threeURLs[i]);
+        const mod = await import(controlsURLs[i]);
+        return { THREE, OrbitControls: mod.OrbitControls };
+      } catch (e) {
+        lastErr = e; console.warn('Falha CDN', i+1, e);
+      }
+    }
+    throw lastErr;
+  }
+  const { THREE, OrbitControls } = await loadThree();
 
-    const DATA = [{"area": "Dique", "x": -20, "y": 0, "z": 0, "height": 5, "real": 0.35, "planejado": 0.25, "ratio": 1.4}, {"area": "Maciço Principal", "x": 0, "y": 0, "z": 0, "height": 8, "real": 0.25, "planejado": 0.15, "ratio": 1.6666666666666667}, {"area": "Miguel Congo", "x": 20, "y": 0, "z": -10, "height": 6, "real": 0.45, "planejado": 0.4, "ratio": 1.125}, {"area": "Regreide", "x": -10, "y": 0, "z": 10, "height": 4, "real": 0.55, "planejado": 0.45, "ratio": 1.2222222222222223}, {"area": "Talude 08", "x": 10, "y": 0, "z": 12, "height": 6, "real": 0.85, "planejado": 0.75, "ratio": 1.1333333333333333}];
+
+    const DATA = [{"area": "Data", "x": 12.500000000000004, "y": 0, "z": 21.650635094610966, "height": 5, "real": null, "planejado": null, "ratio": null}, {"area": "2025-08-01 00:00:00", "x": -12.499999999999995, "y": 0, "z": 21.65063509461097, "height": 5, "real": null, "planejado": null, "ratio": null}];
 
     const canvas = document.getElementById('scene');
     const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
@@ -216,6 +238,7 @@
         camera.position.set(45, 30, 45);
       }
     });
+
   </script>
 </body>
 </html>
