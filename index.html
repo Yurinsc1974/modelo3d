@@ -1,0 +1,221 @@
+
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard 3D - Barragem (DEMO)</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { background: #0b1020; color: #e6e8ef; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    #app { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr; grid-template-rows: 1fr; }
+    #scene { grid-area: 1 / 1; }
+    #ui { grid-area: 1 / 1; pointer-events: none; }
+    .panel { position: absolute; top: 16px; left: 16px; background: rgba(10,15,35,.75); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 12px 14px; backdrop-filter: blur(6px); pointer-events: auto; }
+    .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+    label { font-size: 12px; color: #c9d1e1; }
+    select { background: #11162b; border: 1px solid #2a355a; color: #e6e8ef; border-radius: 8px; padding: 6px 8px; }
+    button { background: #2a355a; color: #fff; border: none; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+    button:hover { background: #3b4980; }
+    .legend { position: absolute; bottom: 16px; left: 16px; background: rgba(10,15,35,.75); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 8px 12px; pointer-events: auto; }
+    .legend .bar { width: 200px; height: 10px; background: linear-gradient(90deg, #e74c3c, #f1c40f, #2ecc71); border-radius: 6px; margin-top: 6px; }
+    .tooltip { position: absolute; padding: 6px 8px; background: rgba(0,0,0,.8); color: #fff; font-size: 12px; border-radius: 6px; transform: translate(-50%, -120%); pointer-events: none; opacity: 0; transition: opacity .15s; }
+    .credit { position: absolute; right: 12px; bottom: 12px; color: #8b93a7; font-size: 12px; }
+    .note { position: absolute; top: 16px; right: 16px; background: rgba(10,15,35,.75); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 10px; pointer-events: auto; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene"></canvas>
+    <div id="ui">
+      <div class="panel">
+        <div class="row">
+          <label for="areaSelect">Área:</label>
+          <select id="areaSelect"><option value="Todos">Todos</option></select>
+          <button id="btnFullscreen" title="Entrar em tela cheia">Tela cheia</button>
+        </div>
+      </div>
+      <div class="legend">
+        <div>Cor do ponto = Desempenho (Real / Planejado)</div>
+        <div class="bar"></div>
+      </div>
+      <div class="tooltip" id="tooltip"></div>
+      <div class="credit">Exemplo 3D (Three.js)</div>
+      <div class="note">Esta é a versão DEMO com dados fixos. Para a versão gerada a partir da sua planilha, abra <b>data_from_excel.html</b>.</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+
+    const DATA = [{"area": "Dique", "x": -20, "y": 0, "z": 0, "height": 5, "real": 0.35, "planejado": 0.25, "ratio": 1.4}, {"area": "Maciço Principal", "x": 0, "y": 0, "z": 0, "height": 8, "real": 0.25, "planejado": 0.15, "ratio": 1.6666666666666667}, {"area": "Miguel Congo", "x": 20, "y": 0, "z": -10, "height": 6, "real": 0.45, "planejado": 0.4, "ratio": 1.125}, {"area": "Regreide", "x": -10, "y": 0, "z": 10, "height": 4, "real": 0.55, "planejado": 0.45, "ratio": 1.2222222222222223}, {"area": "Talude 08", "x": 10, "y": 0, "z": 12, "height": 6, "real": 0.85, "planejado": 0.75, "ratio": 1.1333333333333333}];
+
+    const canvas = document.getElementById('scene');
+    const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b1020);
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
+    camera.position.set(45, 30, 45);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.target.set(0, 4, 0);
+
+    const hemi = new THREE.HemisphereLight(0xbfd7ff, 0x0b142a, 1.2);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+    dir.position.set(30, 50, 10);
+    dir.castShadow = true;
+    scene.add(dir);
+
+    const groundGeo = new THREE.PlaneGeometry(200, 200, 1, 1);
+    const groundMat = new THREE.MeshStandardMaterial({color: 0x1a203a, roughness: 0.95, metalness: 0.0});
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI/2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const waterGeo = new THREE.PlaneGeometry(140, 90, 1, 1);
+    const waterMat = new THREE.MeshPhysicalMaterial({color: 0x2c6fff, roughness: 0.2, transmission: 0.75, opacity: 0.75, transparent: true});
+    const water = new THREE.Mesh(waterGeo, waterMat);
+    water.rotation.x = -Math.PI/2;
+    water.position.set(-10, 0.05, -10);
+    scene.add(water);
+
+    const dam = new THREE.Group();
+    const damGeo = new THREE.BoxGeometry(60, 12, 20);
+    const damMat = new THREE.MeshStandardMaterial({color: 0x6b6f7a});
+    const damBody = new THREE.Mesh(damGeo, damMat);
+    damBody.castShadow = true;
+    damBody.receiveShadow = true;
+    damBody.position.set(10, 6, 0);
+    damBody.rotation.z = THREE.MathUtils.degToRad(-10);
+    dam.add(damBody);
+
+    const crestGeo = new THREE.BoxGeometry(60, 2, 6);
+    const crestMat = new THREE.MeshStandardMaterial({color: 0x9aa0a6});
+    const crest = new THREE.Mesh(crestGeo, crestMat);
+    crest.position.set(10, 12.5, 0);
+    dam.add(crest);
+
+    scene.add(dam);
+
+    const areaSelect = document.getElementById('areaSelect');
+    const tooltip = document.getElementById('tooltip');
+
+    const uniqueAreas = [...new Set(DATA.map(d => d.area))];
+    for (const a of uniqueAreas) {
+      const opt = document.createElement('option');
+      opt.value = a; opt.textContent = a; areaSelect.appendChild(opt);
+    }
+
+    const markers = new THREE.Group();
+    scene.add(markers);
+
+    const sphereGeo = new THREE.SphereGeometry(1.2, 32, 16);
+
+    function colorFromRatio(r) {
+      if (r == null || !isFinite(r)) return new THREE.Color(0x95a5a6);
+      const clamped = Math.max(0.7, Math.min(1.3, r));
+      const t = (clamped - 0.7) / (1.3 - 0.7);
+      const hue = 0.0 + t * 0.33;
+      const color = new THREE.Color();
+      color.setHSL(hue, 0.85, 0.5);
+      return color;
+    }
+
+    const areaToObject = new Map();
+
+    function buildMarkers(filterArea = 'Todos') {
+      while (markers.children.length) markers.remove(markers.children[0]);
+      areaToObject.clear();
+
+      for (const d of DATA) {
+        if (filterArea !== 'Todos' && d.area !== filterArea) continue;
+        const mat = new THREE.MeshStandardMaterial({color: colorFromRatio(d.ratio), emissive: 0x000000, roughness: 0.4});
+        const mesh = new THREE.Mesh(sphereGeo, mat);
+        mesh.position.set(d.x, d.height, d.z);
+        mesh.castShadow = true;
+        mesh.userData = d;
+
+        const cylGeo = new THREE.CylinderGeometry(0.2, 0.2, d.height, 12);
+        const cylMat = new THREE.MeshStandardMaterial({color: 0x3a466f, roughness: 0.9});
+        const ped = new THREE.Mesh(cylGeo, cylMat);
+        ped.position.set(d.x, d.height/2, d.z);
+        ped.castShadow = true; ped.receiveShadow = true;
+
+        markers.add(ped);
+        markers.add(mesh);
+        areaToObject.set(d.area, mesh);
+      }
+    }
+
+    buildMarkers('Todos');
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    function onPointerMove(e) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = - ((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(markers.children, true).filter(i => i.object.geometry === sphereGeo);
+      if (intersects.length) {
+        const obj = intersects[0].object;
+        const d = obj.userData;
+        tooltip.style.left = e.clientX + 'px';
+        tooltip.style.top = e.clientY + 'px';
+        tooltip.style.opacity = 1;
+        tooltip.innerHTML = `<b>${d.area}</b><br/>Real: ${d.real ?? 'n/d'}<br/>Planejado: ${d.planejado ?? 'n/d'}<br/>Razão: ${d.ratio ? d.ratio.toFixed(2) : 'n/d'}`;
+      } else {
+        tooltip.style.opacity = 0;
+      }
+    }
+
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
+
+    areaSelect.addEventListener('change', () => { buildMarkers(areaSelect.value); });
+
+    document.getElementById('btnFullscreen').addEventListener('click', async () => {
+      const el = document.getElementById('app');
+      if (!document.fullscreenElement) {
+        try { await el.requestFullscreen(); } catch { }
+      } else {
+        await document.exitFullscreen();
+      }
+    });
+
+    function resize() {
+      const w = window.innerWidth; const h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w/h; camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    areaSelect.addEventListener('change', () => {
+      const val = areaSelect.value;
+      if (val !== 'Todos' && areaToObject.has(val)) {
+        const obj = areaToObject.get(val);
+        controls.target.copy(obj.position);
+        camera.position.lerp(new THREE.Vector3(obj.position.x + 25, obj.position.y + 12, obj.position.z + 25), 0.15);
+      } else {
+        controls.target.set(0,4,0);
+        camera.position.set(45, 30, 45);
+      }
+    });
+  </script>
+</body>
+</html>
