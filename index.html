@@ -135,7 +135,7 @@
 
     function parsePercentNumber(v){
       if (v==null) return null;
-      if (typeof v === 'number') return v; // 0.85 (85%)
+      if (typeof v === 'number') return v; // 0.85 (85%) ou 85
       const s = String(v).trim().replace(',', '.');
       if (s.endsWith('%')) { const n = parseFloat(s.slice(0,-1)); return isNaN(n)? null : (n/100); }
       const n = parseFloat(s); return isNaN(n)? null : n; // "0.85" => 0.85
@@ -165,7 +165,15 @@
     const kpiRatio = document.getElementById('kpiRatio'); const kpiReal = document.getElementById('kpiReal'); const kpiPlan = document.getElementById('kpiPlan');
 
     const markers = new THREE.Group(); scene.add(markers);
-    const sphereGeo = new THREE.SphereGeometry(1.2,32,16); // <<-- declarado UMA vez
+    const sphereGeo = new THREE.SphereGeometry(1.2,32,16); // declarada UMA vez
+
+    // --- FUNÇÃO DE COR (antes de buildMarkers) ---
+    function colorFromRatio(r){
+      if (r==null || !isFinite(r)) return new THREE.Color(0x95a5a6);
+      const t = (Math.max(0.7, Math.min(1.3, r)) - 0.7) / 0.6; // 0.7->0, 1.3->1
+      const c = new THREE.Color(); c.setHSL(0.0 + t*0.33, 0.85, 0.5);
+      return c;
+    }
 
     let ALL_ROWS = []; let HEADERS = [];
     try {
@@ -177,12 +185,17 @@
       HEADERS = headerRow.map(h=> String(h||'').trim());
       const data = XLSX.utils.sheet_to_json(ws, {header:HEADERS, range: headerIdx+1, defval:null, raw:false});
       const normToOrig={}; HEADERS.forEach(h=> normToOrig[norm(h)] = h);
-      const areaName = normToOrig['area'] || (Object.keys(normToOrig).find(k=>k.includes('area')) && normToOrig[Object.keys(normToOrig).find(k=>k.includes('area'))]);
-      const dateName = normToOrig['data'] || (Object.keys(normToOrig).find(k=>k.includes('data')) && normToOrig[Object.keys(normToOrig).find(k=>k.includes('data'))]);
-      const realName = normToOrig['real'] || normToOrig['real2'] || (Object.keys(normToOrig).find(k=>k.startsWith('real')) && normToOrig[Object.keys(normToOrig).find(k=>k.startswith('real'))])
-      const planName = normToOrig['planejado'] || normToOrig['previsto'] || (Object.keys(normToOrig).find(k=>k.includes('planejad')||k.includes('previst')) && normToOrig[Object.keys(normToOrig).find(k=>k.includes('planejad')||k.includes('previst'))]);
+      const keys = Object.keys(normToOrig);
+      const areaKey = 'area' in normToOrig ? 'area' : (keys.find(k=>k.includes('area')) || null);
+      const dateKey = 'data' in normToOrig ? 'data' : (keys.find(k=>k.includes('data')) || null);
+      const realKey = ('real' in normToOrig) ? 'real' : (('real2' in normToOrig) ? 'real2' : (keys.find(k=>k.startsWith('real')) || null));
+      const planKey = ('planejado' in normToOrig) ? 'planejado' : (('previsto' in normToOrig) ? 'previsto' : (keys.find(k=>k.includes('planejad') || k.includes('previst')) || null));
+      const areaName = areaKey? normToOrig[areaKey] : null;
+      const dateName = dateKey? normToOrig[dateKey] : null;
+      const realName = realKey? normToOrig[realKey] : null;
+      const planName = planKey? normToOrig[planKey] : null;
       if (!areaName) throw new Error('Coluna "Área" não encontrada.');
-      ALL_ROWS = data.map(row=>({ area: row[areaName]? String(row[areaName]).trim():null, date: parseDateFlexible(row[dateName]), real: realName? parsePercentNumber(row[realName]) : null, plan: planName? parsePercentNumber(row[planName]) : null, all: row })).filter(x=> x.area);
+      ALL_ROWS = data.map(row=>({ area: row[areaName]? String(row[areaName]).trim():null, date: dateName? parseDateFlexible(row[dateName]) : null, real: realName? parsePercentNumber(row[realName]) : null, plan: planName? parsePercentNumber(row[planName]) : null, all: row })).filter(x=> x.area);
       for (const a of REQUIRED_AREAS){ if (!ALL_ROWS.some(x=> norm(x.area)===norm(a))) ALL_ROWS.push({area:a, date:null, real:null, plan:null, all:{'Área':a}}); }
     } catch(e){ console.error(e); showError(e.message + '<br><small>Dica: coloque <b>Base.xlsx</b> (ou "Base 1.xlsx") na raiz do repositório. A primeira aba deve conter uma linha de títulos com uma coluna "Área".</small>'); }
 
@@ -198,7 +211,7 @@
     const areaToObject = new Map();
     function buildMarkers(selDate='Todos', selArea='Todos'){ while(markers.children.length) markers.remove(markers.children[0]); areaToObject.clear(); const rows=aggregateForDate(selDate).filter(r=> selArea==='Todos'? true : r.area===selArea); for (const d of rows){ const coords=PRESET_COORDS[d.area] || [0,0,0,5]; const [x,y,z,h]=coords; const ratio=(d.real!=null&&d.plan)?(d.plan!==0? d.real/d.plan:null):null; const mat=new THREE.MeshStandardMaterial({color: colorFromRatio(ratio), roughness:0.4}); const mesh=new THREE.Mesh(sphereGeo, mat); mesh.position.set(x,h,z); mesh.castShadow=true; mesh.userData={...d, ratio, height:h}; const ped=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,h,12), new THREE.MeshStandardMaterial({color:0x3a466f, roughness:0.9})); ped.position.set(x,h/2,z); ped.castShadow=true; ped.receiveShadow=true; markers.add(ped); markers.add(mesh); areaToObject.set(d.area, mesh);} updateKPI(rows); }
 
-    const raycaster=new THREE.Raycaster(); const mouse=new THREE.Vector2(); function onPointerMove(e){ const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y=-((e.clientY-rect.top)/rect.height)*2+1; raycaster.setFromCamera(mouse, camera); const it=raycaster.intersectObjects(markers.children,true).filter(i=> i.object.geometry===sphereGeo); if(it.length){ const d=it[0].object.userData; tooltip.style.left=e.clientX+'px'; tooltip.style.top=e.clientY+'px'; tooltip.style.opacity=1; tooltip.innerHTML=(function buildTooltip(){ const entries=objEntriesOrdered(d.all||{}); let rows=''; for (const [k,v] of entries){ if(k==null||String(k).trim()==='') continue; const nk=norm(k); let vv=v; if(['area','data','real','real2','planejado','previsto'].includes(nk)){ const num=parsePercentNumber(v); vv=(num==null)? v : fmtPct(num); } rows += `<tr><td>${k}</td><td><b>${vv==null? 'n/d' : vv}</b></td></tr>`; } if(!entries.length){ const ds=d.date? d.date.toISOString().slice(0,10) : 'n/d'; rows += `<tr><td>Área</td><td><b>${d.area}</b></td></tr>`; rows += `<tr><td>Data</td><td><b>${ds}</b></td></tr>`; rows += `<tr><td>Real</td><td><b>${fmtPct(d.real)}</b></td></tr>`; rows += `<tr><td>Planejado</td><td><b>${fmtPct(d.plan)}</b></td></tr>`; } return `<table>${rows}</table>`; })(); } else tooltip.style.opacity=0; }
+    const raycaster=new THREE.Raycaster(); const mouse=new THREE.Vector2(); function onPointerMove(e){ const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y=-((e.clientY-rect.top)/rect.height)*2+1; raycaster.setFromCamera(mouse, camera); const it=raycaster.intersectObjects(markers.children,true).filter(i=> i.object.geometry===sphereGeo); if(it.length){ const d=it[0].object.userData; tooltip.style.left=e.clientX+'px'; tooltip.style.top=e.clientY+'px'; tooltip.style.opacity=1; tooltip.innerHTML=(function buildTooltip(){ const entries=objEntriesOrdered(d.all||{}); let rows=''; const important=new Set(['area','data','real','real2','planejado','previsto']); for (const [k,v] of entries){ if(k==null||String(k).trim()==='') continue; const nk=norm(k); let vv=v; if(important.has(nk)){ const num=parsePercentNumber(v); vv=(num==null)? v : fmtPct(num); } rows += `<tr><td>${k}</td><td><b>${vv==null? 'n/d' : vv}</b></td></tr>`; } if(!entries.length){ const ds=d.date? d.date.toISOString().slice(0,10) : 'n/d'; rows += `<tr><td>Área</td><td><b>${d.area}</b></td></tr>`; rows += `<tr><td>Data</td><td><b>${ds}</b></td></tr>`; rows += `<tr><td>Real</td><td><b>${fmtPct(d.real)}</b></td></tr>`; rows += `<tr><td>Planejado</td><td><b>${fmtPct(d.plan)}</b></td></tr>`; } return `<table>${rows}</table>`; })(); } else tooltip.style.opacity=0; }
     renderer.domElement.addEventListener('pointermove', onPointerMove);
 
     document.getElementById('btnFullscreen').addEventListener('click', async ()=>{ const el=document.getElementById('app'); if(!document.fullscreenElement){ try{ await el.requestFullscreen(); }catch{} } else { await document.exitFullscreen(); } });
