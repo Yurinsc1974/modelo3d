@@ -3,33 +3,43 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dashboard 3D - Barragem (Dinâmico a partir do Excel)</title>
+  <title>Dashboard 3D - Barragem (Dinâmico do Excel)</title>
   <style>
     html, body { height: 100%; margin: 0; }
     body { background: #0b1020; color: #e6e8ef; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
     #app { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr; grid-template-rows: 1fr; }
     #scene { grid-area: 1 / 1; }
     #ui { grid-area: 1 / 1; pointer-events: none; }
+
+    /* Top bar */
     .panel { position: absolute; top: 16px; left: 16px; background: rgba(10,15,35,.75); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 12px 14px; backdrop-filter: blur(6px); pointer-events: auto; display: flex; gap: 10px; align-items: center; }
     label { font-size: 12px; color: #c9d1e1; margin-right: 6px; }
     select { background: #11162b; border: 1px solid #2a355a; color: #e6e8ef; border-radius: 8px; padding: 6px 8px; }
     button { background: #2a355a; color: #fff; border: none; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
     button:hover { background: #3b4980; }
+
+    /* Logo no canto superior direito */
+    .logo { position: absolute; top: 12px; right: 12px; height: 42px; pointer-events: auto; background: rgba(10,15,35,.15); border-radius: 8px; padding: 6px 8px; border: 1px solid rgba(255,255,255,.08); }
+
     .legend { position: absolute; bottom: 16px; left: 16px; background: rgba(10,15,35,.75); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 8px 12px; pointer-events: auto; }
     .legend .bar { width: 200px; height: 10px; background: linear-gradient(90deg, #e74c3c, #f1c40f, #2ecc71); border-radius: 6px; margin-top: 6px; }
-    .tooltip { position: absolute; padding: 6px 8px; background: rgba(0,0,0,.85); color: #fff; font-size: 12px; border-radius: 6px; transform: translate(-50%, -120%); pointer-events: none; opacity: 0; transition: opacity .15s; }
+
+    .tooltip { position: absolute; padding: 8px 10px; background: rgba(0,0,0,.85); color: #fff; font-size: 12px; border-radius: 8px; transform: translate(-50%, -120%); pointer-events: none; opacity: 0; transition: opacity .15s; max-width: 340px; }
+    .tooltip table { border-collapse: collapse; width: 100%; font-size: 12px; }
+    .tooltip td { padding: 2px 0; vertical-align: top; }
+    .tooltip td:first-child { color: #aab4cf; padding-right: 8px; }
+
     .credit { position: absolute; right: 12px; bottom: 12px; color: #8b93a7; font-size: 12px; }
 
     /* Sidebar KPI */
-    .sidebar { position: absolute; top: 80px; left: 16px; width: 280px; display: grid; gap: 12px; pointer-events: auto; }
+    .sidebar { position: absolute; top: 76px; left: 16px; width: 280px; display: grid; gap: 12px; pointer-events: auto; }
     .kpi { background: linear-gradient(180deg, rgba(31,41,77,.85), rgba(20,27,52,.85)); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
     .kpi h4 { margin: 0 0 8px 0; font-size: 12px; font-weight: 600; letter-spacing: .6px; color: #aab4cf; text-transform: uppercase; }
     .kpi .val { font-size: 28px; font-weight: 700; }
     .kpi .sub { font-size: 12px; color: #aab4cf; }
 
     /* Error banner */
-    .error { position: absolute; top: 16px; right: 16px; background: #3b1b1b; color: #ffd5d5; border: 1px solid #b14a4a; padding: 10px 12px; border-radius: 10px; pointer-events: auto; max-width: 520px; }
-    .error small { opacity: .85; }
+    .error { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: #3b1b1b; color: #ffd5d5; border: 1px solid #b14a4a; padding: 10px 12px; border-radius: 10px; pointer-events: auto; max-width: 560px; }
   </style>
 </head>
 <body>
@@ -48,21 +58,23 @@
         <button id="btnFullscreen" title="Entrar em tela cheia">Tela cheia</button>
       </div>
 
+      <img class="logo" src="https://upload.wikimedia.org/wikipedia/pt/thumb/c/cc/Logotipo_Vale.svg/1920px-Logotipo_Vale.svg.png" alt="Logo"/>
+
       <div class="sidebar">
         <div class="kpi">
           <h4>Desempenho médio</h4>
           <div class="val" id="kpiRatio">n/d</div>
-          <div class="sub">Média de Realv2 / Planejado</div>
+          <div class="sub">Média de Real / Planejado</div>
         </div>
         <div class="kpi">
           <h4>Real médio</h4>
           <div class="val" id="kpiReal">n/d</div>
-          <div class="sub">% médio das áreas filtradas</div>
+          <div class="sub">Média (%) das áreas filtradas</div>
         </div>
         <div class="kpi">
           <h4>Planejado médio</h4>
           <div class="val" id="kpiPlan">n/d</div>
-          <div class="sub">% médio das áreas filtradas</div>
+          <div class="sub">Média (%) das áreas filtradas</div>
         </div>
       </div>
 
@@ -77,7 +89,7 @@
   </div>
 
   <script type="module">
-    // ---------- Fallback de CDNs ----------
+    // ---------- CDNs (fallback) ----------
     async function loadThree() {
       const threeURLs = [
         'https://esm.sh/three@0.160.0',
@@ -106,7 +118,7 @@
       throw new Error('Não foi possível carregar a biblioteca de Excel (SheetJS).');
     }
 
-    // ---------- Utilidades ----------
+    // ---------- Helpers ----------
     const REQUIRED_AREAS = ['Dique','Maciço Principal','Miguel Congo','Regreide','Talude 08'];
     const PRESET_COORDS = {
       'Dique': [-20, 0, 0, 5],
@@ -125,49 +137,37 @@
       throw new Error('Não foi possível baixar a planilha. Coloque <b>Base.xlsx</b> (ou "Base 1.xlsx") na raiz do repositório.');
     }
 
-    function parseSheetToRows(XLSX, ws){
-      // Lê tudo como matriz (header:1) e detecta a primeira linha de cabeçalho válida (contendo algo como "area")
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
-      let headerIdx = -1; let headerRow = null;
-      for (let i=0;i<Math.min(rows.length, 20); i++){
-        const r = rows[i]; if (!r) continue;
-        const normalized = r.map(c=> norm(c));
-        const hasArea = normalized.some(c => c.includes('area'));
-        const coverage = normalized.filter(c=>c).length; // número de células não vazias
-        if (hasArea && coverage>=2){ headerIdx=i; headerRow=r; break; }
-      }
-      if (headerIdx===-1 || !headerRow){ throw new Error('Cabeçalho não encontrado. Certifique-se que a primeira linha com títulos possua uma coluna "Área".'); }
-
-      // Mapeia nomes → índice
-      const headers = headerRow; const map = {}; headers.forEach((h,idx)=>{ map[norm(h)] = idx; });
-      const areaIdx = map['area'] || Object.entries(map).find(([k])=>k.includes('area'))?.[1];
-      const dateIdx = map['data'] || Object.entries(map).find(([k])=>k.includes('data'))?.[1];
-      const realIdx = map['real'] || map['real2'] || Object.entries(map).find(([k])=>k.startsWith('real'))?.[1];
-      const planIdx = map['planejado'] || map['previsto'] || Object.entries(map).find(([k])=>k.includes('planejad')||k.includes('previst'))?.[1];
-      if (areaIdx==null) throw new Error('Coluna "Área" não encontrada na planilha.');
-
-      const out = [];
-      for (let i=headerIdx+1; i<rows.length; i++){
-        const r = rows[i]; if (!r) continue;
-        const area = r[areaIdx]; if (area==null || String(area).trim()==='') continue;
-        const item = {
-          area: String(area).trim(),
-          date: dateIdx!=null ? r[dateIdx] : null,
-          real: realIdx!=null ? (r[realIdx]!=null? Number(r[realIdx]) : null) : null,
-          plan: planIdx!=null ? (r[planIdx]!=null? Number(r[planIdx]) : null) : null,
-        };
-        out.push(item);
-      }
-      return out;
+    function parsePercentNumber(v){
+      if (v==null) return null;
+      if (typeof v === 'number') return v; // já numérico (0..1 ou 0..100)
+      const s = String(v).trim().replace(',', '.');
+      if (s.endsWith('%')) { const n = parseFloat(s.slice(0,-1)); return isNaN(n)? null : (n/100); }
+      const n = parseFloat(s); return isNaN(n)? null : n; // se vier 0.85, mantém 0.85
     }
+    function fmtPct(n, digits=0){ return (n==null||!isFinite(n))? 'n/d' : (n*100).toFixed(digits).replace('.',',') + '%'; }
+
+    function excelSerialToDate(n){
+      const base = new Date(Date.UTC(1899,11,30));
+      return new Date(base.getTime() + (Number(n)||0)*86400000);
+    }
+    function parseDateFlexible(v){
+      if (v==null) return null;
+      if (typeof v === 'number') return excelSerialToDate(v);
+      const s = String(v).trim();
+      const d1 = new Date(s); if (!isNaN(d1)) return d1;
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00Z`);
+      const n = parseFloat(s); if (!isNaN(n)) return excelSerialToDate(n);
+      return null;
+    }
+
+    function objEntriesOrdered(o){ return Object.keys(o).map(k=>[k,o[k]]); }
 
     const { THREE, OrbitControls } = await loadThree();
     const XLSX = await loadSheetJS();
 
     // ---------- THREE ----------
     const canvas = document.getElementById('scene');
-    const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const renderer = new THREE.WebGLRenderer({canvas, antialias: true}); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b1020);
     const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000); camera.position.set(45,30,45);
     const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.target.set(0,4,0);
@@ -181,33 +181,124 @@
     const kpiRatio = document.getElementById('kpiRatio'); const kpiReal = document.getElementById('kpiReal'); const kpiPlan = document.getElementById('kpiPlan');
     const markers = new THREE.Group(); scene.add(markers); const sphereGeo = new THREE.SphereGeometry(1.2,32,16);
 
-    function colorFromRatio(r){ if (r==null||!isFinite(r)) return new THREE.Color(0x95a5a6); const t=(Math.max(0.7,Math.min(1.3,r))-0.7)/0.6; const c=new THREE.Color(); c.setHSL(0.0+t*0.33,0.85,0.5); return c; }
-    function parseDate(v){ const d=new Date(v); return isNaN(d)? null : d; }
-    function fmt(v,digits=2){ return (v==null||!isFinite(v))? 'n/d' : (typeof v==='number'? v.toFixed(digits) : String(v)); }
-
-    let ROWS = [];
+    let ALL_ROWS = []; // {area,date,real,plan, all: {cab->fmtValue}}
+    let HEADERS = [];  // ordem original para tooltip
     try {
       const buf = await tryFetchExcel();
       const wb = XLSX.read(buf, {type:'array'}); const ws = wb.Sheets[wb.SheetNames[0]]; if (!ws) throw new Error('Planilha vazia.');
-      ROWS = parseSheetToRows(XLSX, ws);
-    } catch(e){ console.error(e); showError(e.message + '<br><small>Dica: garanta que o arquivo se chame <b>Base.xlsx</b> (ou "Base 1.xlsx") e que a linha de cabeçalho contenha uma coluna "Área". Primeira planilha do arquivo deve ter os dados.</small>'); }
 
-    // Garantir as 5 áreas
-    for (const a of REQUIRED_AREAS){ if (!ROWS.some(x=> norm(x.area)===norm(a))) ROWS.push({area:a, date:null, real:null, plan:null}); }
+      // 1) Detectar linha de cabeçalho
+      const asMatrix = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:false});
+      let headerIdx=-1, headerRow=null; for (let i=0;i<Math.min(asMatrix.length, 25); i++){ const r=asMatrix[i]||[]; const normalized=r.map(c=> norm(c)); const hasArea = normalized.some(c=> c.includes('area')); const coverage = normalized.filter(c=>c).length; if (hasArea && coverage>=2){ headerIdx=i; headerRow=r; break; } }
+      if (headerIdx===-1) throw new Error('Cabeçalho não encontrado. A planilha deve conter uma coluna "Área".');
+      HEADERS = headerRow.map(h=> String(h||'').trim());
 
-    function getUniqueDates(){ const ds=new Set(); for (const r of ROWS){ if (r.date){ const d=parseDate(r.date); if (d) ds.add(d.toISOString().slice(0,10)); } } return Array.from(ds).sort(); }
-    function getUniqueAreas(){ const as=new Set(REQUIRED_AREAS); for(const r of ROWS) if(r.area) as.add(r.area); return Array.from(as); }
+      // 2) Ler dados com os cabeçalhos encontrados (formatados como no Excel)
+      const data = XLSX.utils.sheet_to_json(ws, {header:HEADERS, range: headerIdx+1, defval:null, raw:false});
 
-    function buildSelectors(){ const dates=getUniqueDates(); dateSelect.innerHTML='<option value="Todos">Todos</option>'+dates.map(d=>`<option value="${d}">${d}</option>`).join(''); const areas=getUniqueAreas(); areaSelect.innerHTML='<option value="Todos">Todos</option>'+areas.map(a=>`<option value="${a}">${a}</option>`).join(''); }
+      // 3) Mapear colunas-chave por nome normalizado (área, data, real/real2, planejado/previsto)
+      const normToOrig = {}; HEADERS.forEach(h=> normToOrig[norm(h)] = h);
+      const areaName = normToOrig['area'] || Object.keys(normToOrig).find(k=>k.includes('area')) && normToOrig[Object.keys(normToOrig).find(k=>k.includes('area'))];
+      const dateName = normToOrig['data'] || Object.keys(normToOrig).find(k=>k.includes('data')) && normToOrig[Object.keys(normToOrig).find(k=>k.includes('data'))];
+      const realName = normToOrig['real'] || normToOrig['real2'] || Object.keys(normToOrig).find(k=>k.startsWith('real')) && normToOrig[Object.keys(normToOrig).find(k=>k.startsWith('real'))];
+      const planName = normToOrig['planejado'] || normToOrig['previsto'] || Object.keys(normToOrig).find(k=>k.includes('planejad')||k.includes('previst')) && normToOrig[Object.keys(normToOrig).find(k=>k.includes('planejad')||k.includes('previst'))];
+      if (!areaName) throw new Error('Coluna "Área" não encontrada.');
 
-    function aggregateForDate(selDate){ const byArea=new Map(); for(const r of ROWS){ const rDate=r.date?parseDate(r.date):null; if(selDate!=='Todos' && rDate && rDate.toISOString().slice(0,10)!==selDate) continue; const key=r.area||'Área'; const prev=byArea.get(key); if(!prev) byArea.set(key,r); else { const pd=prev.date?parseDate(prev.date):null; const rd=rDate; if(!pd && rd) byArea.set(key,r); else if(pd && rd && rd>pd) byArea.set(key,r);} } for(const a of REQUIRED_AREAS){ if(!byArea.has(a)) byArea.set(a,{area:a,date:null,real:null,plan:null}); } return Array.from(byArea.values()); }
+      // 4) Converter linhas
+      ALL_ROWS = data.map(row => {
+        const area = row[areaName]!=null ? String(row[areaName]).trim() : null;
+        const dateRaw = row[dateName];
+        const date = parseDateFlexible(dateRaw);
+        const realNum = realName? parsePercentNumber(row[realName]) : null;
+        const planNum = planName? parsePercentNumber(row[planName]) : null;
+        return { area, date, real: realNum, plan: planNum, all: row };
+      }).filter(x=> x.area);
 
-    function updateKPI(rows){ const vals=rows.map(r=>({real:r.real, plan:r.plan, ratio:(r.real!=null&&r.plan)?(r.plan!==0? r.real/r.plan:null):null})); const mean=(arr)=>{ const v=arr.filter(x=>x!=null&&isFinite(x)); return v.length? (v.reduce((a,b)=>a+b,0)/v.length):null;}; kpiRatio.textContent=fmt(mean(vals.map(v=>v.ratio))); kpiReal.textContent=fmt(mean(vals.map(v=>v.real))); kpiPlan.textContent=fmt(mean(vals.map(v=>v.plan))); }
+      // Garantir as 5 áreas (com placeholders)
+      for (const a of REQUIRED_AREAS){ if (!ALL_ROWS.some(x=> norm(x.area)===norm(a))) ALL_ROWS.push({area:a, date:null, real:null, plan:null, all: {[areaName||'Área']: a}}); }
 
-    const areaToObject=new Map();
-    function buildMarkers(selDate='Todos', selArea='Todos'){ while(markers.children.length) markers.remove(markers.children[0]); areaToObject.clear(); const rows=aggregateForDate(selDate).filter(r=> selArea==='Todos'? true : r.area===selArea); for(const d of rows){ const coords=PRESET_COORDS[d.area] || [0,0,0,5]; const [x,y,z,h]=coords; const ratio=(d.real!=null&&d.plan)?(d.plan!==0? d.real/d.plan:null):null; const mat=new THREE.MeshStandardMaterial({color: colorFromRatio(ratio), roughness:0.4}); const mesh=new THREE.Mesh(sphereGeo, mat); mesh.position.set(x,h,z); mesh.castShadow=true; mesh.userData={...d, ratio, height:h}; const ped=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,h,12), new THREE.MeshStandardMaterial({color:0x3a466f, roughness:0.9})); ped.position.set(x,h/2,z); ped.castShadow=true; ped.receiveShadow=true; markers.add(ped); markers.add(mesh); areaToObject.set(d.area, mesh);} updateKPI(rows); }
+    } catch(e){ console.error(e); showError(e.message + '<br><small>Dica: coloque <b>Base.xlsx</b> (ou "Base 1.xlsx") na raiz do repositório. A primeira aba deve conter uma linha de títulos com uma coluna "Área".</small>'); }
 
-    const raycaster=new THREE.Raycaster(); const mouse=new THREE.Vector2(); function onPointerMove(e){ const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y=-((e.clientY-rect.top)/rect.height)*2+1; raycaster.setFromCamera(mouse, camera); const it=raycaster.intersectObjects(markers.children,true).filter(i=>i.object.geometry===sphereGeo); if(it.length){ const d=it[0].object.userData; tooltip.style.left=e.clientX+'px'; tooltip.style.top=e.clientY+'px'; tooltip.style.opacity=1; const dstr=d.date? new Date(d.date).toISOString().slice(0,10) : 'n/d'; tooltip.innerHTML=`<b>${d.area}</b><br/>Data: ${dstr}<br/>Real: ${fmt(d.real)}<br/>Planejado: ${fmt(d.plan)}<br/>Razão: ${d.ratio? d.ratio.toFixed(2):'n/d'}`; } else tooltip.style.opacity=0; }
+    function uniqueDates(){ const s=new Set(); for (const r of ALL_ROWS){ if (r.date){ s.add(r.date.toISOString().slice(0,10)); } } return Array.from(s).sort(); }
+    function uniqueAreas(){ const s=new Set(REQUIRED_AREAS); for (const r of ALL_ROWS){ if (r.area) s.add(r.area); } return Array.from(s); }
+
+    function buildSelectors(){
+      dateSelect.innerHTML = '<option value="Todos">Todos</option>' + uniqueDates().map(d=>`<option value="${d}">${d}</option>`).join('');
+      areaSelect.innerHTML = '<option value="Todos">Todos</option>' + uniqueAreas().map(a=>`<option value="${a}">${a}</option>`).join('');
+    }
+
+    function aggregateForDate(selDate){
+      const byArea = new Map();
+      for (const r of ALL_ROWS){
+        const key = r.area; const d = r.date; if (selDate!=='Todos' && d && d.toISOString().slice(0,10)!==selDate) continue;
+        const prev = byArea.get(key); if (!prev) byArea.set(key, r); else {
+          if (!prev.date && d) byArea.set(key, r); else if (prev.date && d && d>prev.date) byArea.set(key, r);
+        }
+      }
+      for (const a of REQUIRED_AREAS){ if (!byArea.has(a)) byArea.set(a, {area:a, date:null, real:null, plan:null, all:{'Área':a}}); }
+      return Array.from(byArea.values());
+    }
+
+    function updateKPI(rows){
+      const ratios = rows.map(r=> (r.real!=null && r.plan)? (r.plan!==0? r.real/r.plan : null) : null).filter(x=>x!=null && isFinite(x));
+      const reals  = rows.map(r=> r.real).filter(x=>x!=null && isFinite(x));
+      const plans  = rows.map(r=> r.plan).filter(x=>x!=null && isFinite(x));
+      const mean = arr => arr.length? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+      kpiRatio.textContent = fmtPct(mean(ratios), 1);
+      kpiReal.textContent  = fmtPct(mean(reals), 1);
+      kpiPlan.textContent  = fmtPct(mean(plans), 1);
+    }
+
+    const areaToObject = new Map();
+
+    function buildMarkers(selDate='Todos', selArea='Todos'){
+      while (markers.children.length) markers.remove(markers.children[0]); areaToObject.clear();
+      const rows = aggregateForDate(selDate).filter(r=> selArea==='Todos'? true : r.area===selArea);
+
+      for (const d of rows){
+        const coords = PRESET_COORDS[d.area] || [0,0,0,5]; const [x,y,z,h] = coords;
+        const ratio = (d.real!=null && d.plan)? (d.plan!==0? d.real/d.plan : null) : null;
+        const mat = new THREE.MeshStandardMaterial({color: colorFromRatio(ratio), roughness:0.4});
+        const mesh = new THREE.Mesh(sphereGeo, mat); mesh.position.set(x,h,z); mesh.castShadow=true; mesh.userData={...d, ratio, height:h};
+        const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,h,12), new THREE.MeshStandardMaterial({color:0x3a466f, roughness:0.9})); ped.position.set(x,h/2,z); ped.castShadow=true; ped.receiveShadow=true;
+        markers.add(ped); markers.add(mesh); areaToObject.set(d.area, mesh);
+      }
+
+      updateKPI(rows);
+    }
+
+    const sphereGeo = new THREE.SphereGeometry(1.2, 32, 16);
+    function colorFromRatio(r){ if (r==null||!isFinite(r)) return new THREE.Color(0x95a5a6); const t = (Math.max(0.7, Math.min(1.3, r)) - 0.7) / 0.6; const c = new THREE.Color(); c.setHSL(0.0 + t*0.33, 0.85, 0.5); return c; }
+
+    // Tooltip com todas as colunas (formatadas como no Excel)
+    const importantKeysNorm = new Set(['area','data','real','real2','planejado','previsto']);
+    function buildTooltipHTML(d){
+      const dateStr = d.date? d.date.toISOString().slice(0,10) : 'n/d';
+      const entries = objEntriesOrdered(d.all||{});
+      let rows = '';
+      for (const [k,v] of entries){
+        if (k==null || String(k).trim()==='') continue;
+        const nk = norm(k);
+        // Exibir Real/Planejado como % (se forem números simples sem %)
+        let vv = v;
+        if (importantKeysNorm.has(nk)) {
+          const num = parsePercentNumber(v);
+          vv = (num==null)? v : fmtPct(num, 1);
+        }
+        rows += `<tr><td>${k}</td><td><b>${vv==null? 'n/d' : vv}</b></td></tr>`;
+      }
+      if (!entries.length){
+        rows += `<tr><td>Área</td><td><b>${d.area}</b></td></tr>`;
+        rows += `<tr><td>Data</td><td><b>${dateStr}</b></td></tr>`;
+        rows += `<tr><td>Real</td><td><b>${fmtPct(d.real,1)}</b></td></tr>`;
+        rows += `<tr><td>Planejado</td><td><b>${fmtPct(d.plan,1)}</b></td></tr>`;
+      }
+      return `<table>${rows}</table>`;
+    }
+
+    // Eventos
+    const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+    function onPointerMove(e){ const rect = renderer.domElement.getBoundingClientRect(); mouse.x = ((e.clientX-rect.left)/rect.width)*2 - 1; mouse.y = -((e.clientY-rect.top)/rect.height)*2 + 1; raycaster.setFromCamera(mouse, camera); const it = raycaster.intersectObjects(markers.children, true).filter(i=> i.object.geometry===sphereGeo); if (it.length){ const d = it[0].object.userData; tooltip.style.left = e.clientX + 'px'; tooltip.style.top = e.clientY + 'px'; tooltip.style.opacity = 1; tooltip.innerHTML = buildTooltipHTML(d); } else tooltip.style.opacity = 0; }
     renderer.domElement.addEventListener('pointermove', onPointerMove);
 
     document.getElementById('btnFullscreen').addEventListener('click', async ()=>{ const el=document.getElementById('app'); if(!document.fullscreenElement){ try{ await el.requestFullscreen(); }catch{} } else { await document.exitFullscreen(); } });
@@ -217,8 +308,8 @@
     areaSelect.addEventListener('change', ()=>{ buildMarkers(dateSelect.value, areaSelect.value); focusCamera(); }); dateSelect.addEventListener('change', ()=>{ buildMarkers(dateSelect.value, areaSelect.value); });
     function focusCamera(){ const val=areaSelect.value; if(val!=='Todos' && areaToObject.has(val)){ const obj=areaToObject.get(val); controls.target.copy(obj.position); camera.position.lerp(new THREE.Vector3(obj.position.x+25, obj.position.y+12, obj.position.z+25), 0.2);} else { controls.target.set(0,4,0); camera.position.set(45,30,45);} }
 
+    // Boot
     buildSelectors(); buildMarkers('Todos','Todos');
   </script>
 </body>
 </html>
-
