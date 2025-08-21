@@ -1,228 +1,189 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dashboard 3D - Barragem (Dinâmico do Excel)</title>
-  <style>
-    html, body { height: 100%; margin: 0; }
-    body { background: #0b1020; color: #e6e8ef; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
-    #app { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr; grid-template-rows: 1fr; }
-    #scene { grid-area: 1 / 1; }
-    #ui { grid-area: 1 / 1; pointer-events: none; }
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Avanço de Obra</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Material+Symbols+Outlined:wght@300" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.20.1/dist/xlsx.full.min.js" defer></script>
+<style>
+  :root{
+    --bg:#f3f4f8; --card:#ffffff; --muted:#6e6e7b; --text:#2a2a33;
+    --accent:#6c63ff; --shadow:0 10px 25px rgba(17,24,39,0.08); --radius:16px;
+    --header-h:64px; --page-pad:20px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
 
-    .panel { position: absolute; top: 16px; left: 16px; background: rgba(10,15,35,.75); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 12px 14px; backdrop-filter: blur(6px); pointer-events: auto; display: flex; gap: 10px; align-items: center; }
-    label { font-size: 12px; color: #c9d1e1; margin-right: 6px; }
-    select { background: #11162b; border: 1px solid #2a355a; color: #e6e8ef; border-radius: 8px; padding: 6px 8px; }
-    button { background: #2a355a; color: #fff; border: none; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
-    button:hover { background: #3b4980; }
+  /* Topbar */
+  .topbar{height:var(--header-h);display:flex;align-items:center;justify-content:space-between;padding:0 var(--page-pad);background:#fff;box-shadow:var(--shadow);position:sticky;top:0;z-index:5}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.5px}
+  .menu-btn,.icon-btn{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:#fff;border:1px solid #e7e9f4;box-shadow:none}
+  .user{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:999px;background:linear-gradient(135deg,#eef 0%,#fff 100%);box-shadow:inset 0 0 0 1px #e8e8f3}
 
-    .logo { position: absolute; top: 12px; right: 12px; height: 42px; pointer-events: auto; background: rgba(10,15,35,.15); border-radius: 8px; padding: 6px 8px; border: 1px solid rgba(255,255,255,.08); }
+  /* Área principal agora FULL-WIDTH (sem sidebar direita) */
+  .app{display:block;padding:var(--page-pad);max-width:none;margin:0}
 
-    .legend { position: absolute; bottom: 16px; left: 16px; background: rgba(10,15,35,.75); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 8px 12px; pointer-events: auto; }
-    .legend .bar { width: 200px; height: 10px; background: linear-gradient(90deg, #e74c3c, #f1c40f, #2ecc71); border-radius: 6px; margin-top: 6px; }
+  .content{display:grid;gap:20px;min-width:0}
+  .title{font-size:20px;font-weight:700;margin:4px 4px 0}
 
-    .tooltip { position: absolute; padding: 8px 10px; background: rgba(0,0,0,.85); color: #fff; font-size: 12px; border-radius: 8px; transform: translate(-50%, -120%); pointer-events: none; opacity: 0; transition: opacity .15s; max-width: 360px; }
-    .tooltip table { border-collapse: collapse; width: 100%; font-size: 12px; }
-    .tooltip td { padding: 2px 0; vertical-align: top; }
-    .tooltip td:first-child { color: #aab4cf; padding-right: 8px; }
+  /* Grid de 12 colunas em toda a largura */
+  .grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:minmax(150px,auto);gap:20px}
 
-    .credit { position: absolute; right: 12px; bottom: 12px; color: #8b93a7; font-size: 12px; }
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+  .card h4{margin:0;font-size:14px;color:#5a5a66;font-weight:600}
 
-    .sidebar { position: absolute; top: 76px; left: 16px; width: 280px; display: grid; gap: 12px; pointer-events: auto; }
-    .kpi { background: linear-gradient(180deg, rgba(31,41,77,.85), rgba(20,27,52,.85)); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 14px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
-    .kpi h4 { margin: 0 0 8px 0; font-size: 12px; font-weight: 600; letter-spacing: .6px; color: #aab4cf; text-transform: uppercase; }
-    .kpi .val { font-size: 28px; font-weight: 700; }
-    .kpi .sub { font-size: 12px; color: #aab4cf; }
+  .kpis{display:flex;gap:16px;flex-wrap:wrap}
+  .kpi{flex:1 1 220px;background:linear-gradient(180deg,#fff 0%,#fafbff 100%);border-radius:14px;padding:14px;box-shadow:inset 0 0 0 1px #eef1ff}
+  .kpi .value{font-size:22px;font-weight:800;color:#2e2e3b}
+  .kpi .caption{font-size:12px;color:var(--muted)}
 
-    .error { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: #3b1b1b; color: #ffd5d5; border: 1px solid #b14a4a; padding: 10px 12px; border-radius: 10px; pointer-events: auto; max-width: 560px; }
-  </style>
+  /* Larguras dos cards para tela grande (full-width) */
+  .c1{grid-column:span 4}
+  .c2{grid-column:span 4}
+  .c3{grid-column:span 4}
+  .c4{grid-column:span 12; height:520px} /* 3D expandido na largura total */
+  .c5{grid-column:span 12}
+
+  .filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .select{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#f7f8ff;border-radius:10px;border:1px solid #e6e8ff;color:#444}
+  select{border:none;background:transparent;outline:none;font-weight:600;color:#333}
+
+  .gauge-wrap{display:flex;align-items:center;justify-content:center;height:200px}
+  .gauge svg{width:100%;max-width:420px}
+  .gauge text{font-weight:800;fill:#333}
+
+  /* Canvas 3D ocupa largura total */
+  #canvas3d{position:relative;flex:1;min-height:360px;border-radius:12px;overflow:hidden;background:radial-gradient(ellipse at top left,#f8f9ff,#f3f4f8)}
+  .card-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;background:var(--accent);color:#fff;padding:8px 12px;border-radius:10px;font-weight:600;box-shadow:0 6px 16px rgba(108,99,255,.25)}
+
+  @media (max-width: 1200px){
+    .grid{grid-template-columns:repeat(6,1fr)}
+    .c1,.c2,.c3{grid-column:span 6}  /* 2 por linha */
+    .c4,.c5{grid-column:span 6}
+  }
+  @media (max-width: 800px){
+    .grid{grid-template-columns:repeat(1,1fr)}
+    .c1,.c2,.c3,.c4,.c5{grid-column:span 1}
+    .c4{height:360px}
+  }
+</style>
 </head>
 <body>
-  <div id="app">
-    <canvas id="scene"></canvas>
-    <div id="ui">
-      <div class="panel">
-        <div>
-          <label for="dateSelect">Data:</label>
-          <select id="dateSelect"><option value="Todos">Todos</option></select>
-        </div>
-        <div>
-          <label for="areaSelect">Área:</label>
-          <select id="areaSelect"><option value="Todos">Todos</option></select>
-        </div>
-        <button id="btnFullscreen" title="Entrar em tela cheia">Tela cheia</button>
-      </div>
-
-      <img class="logo" src="https://upload.wikimedia.org/wikipedia/pt/thumb/c/cc/Logotipo_Vale.svg/1920px-Logotipo_Vale.svg.png" alt="Logo"/>
-
-      <div class="sidebar">
-        <div class="kpi">
-          <h4>Desempenho médio</h4>
-          <div class="val" id="kpiRatio">n/d</div>
-          <div class="sub">Média de Real / Planejado</div>
-        </div>
-        <div class="kpi">
-          <h4>Real médio</h4>
-          <div class="val" id="kpiReal">n/d</div>
-          <div class="sub">Média (%) das áreas filtradas</div>
-        </div>
-        <div class="kpi">
-          <h4>Planejado médio</h4>
-          <div class="val" id="kpiPlan">n/d</div>
-          <div class="sub">Média (%) das áreas filtradas</div>
-        </div>
-      </div>
-
-      <div class="legend">
-        <div>Cor do ponto = Desempenho (Real / Planejado)</div>
-        <div class="bar"></div>
-      </div>
-      <div class="tooltip" id="tooltip"></div>
-      <div class="credit">Fazendo 3D (Three.js)</div>
-      <div class="error" id="error" style="display:none"></div>
-    </div>
+<header class="topbar">
+  <div class="brand">
+    <div class="menu-btn"><span class="material-symbols-outlined">menu</span></div>
+    <div>SITUAÇÃO ATUAL - BARRAGEM DE DOUTOR</div>
   </div>
+  <div class="actions" style="display:flex; gap:8px; align-items:center;">
+    <button class="icon-btn"><span class="material-symbols-outlined">lock</span></button>
+    <button class="icon-btn"><span class="material-symbols-outlined">person_add</span></button>
+    <button class="icon-btn"><span class="material-symbols-outlined">settings</span></button>
+    <button class="icon-btn"><span class="material-symbols-outlined">file_download</span></button>
+    <div class="user"><span class="material-symbols-outlined">account_circle</span><strong>Yuri</strong></div>
+  </div>
+</header>
 
-  <script type="module">
-    // ---------- CDNs (fallback) ----------
-    async function loadThree() {
-      const threeURLs = [
-        'https://esm.sh/three@0.160.0',
-        'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
-        'https://unpkg.com/three@0.160.0/build/three.module.js'
-      ];
-      const controlsURLs = [
-        'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js',
-        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js?module',
-        'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js?module'
-      ];
-      let lastErr;
-      for (let i=0;i<threeURLs.length;i++){
-        try { const THREE = await import(threeURLs[i]); const mod = await import(controlsURLs[i]); return { THREE, OrbitControls: mod.OrbitControls }; } catch(e){ lastErr=e; console.warn('CDN falhou', i+1, e); }
-      }
-      throw lastErr;
-    }
-    async function loadSheetJS() {
-      const urls = [
-        'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
-        'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js'
-      ];
-      for (const u of urls) {
-        try { await new Promise((res, rej)=>{ const s=document.createElement('script'); s.src=u; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); if (window.XLSX) return window.XLSX; } catch(e){ console.warn('Falha SheetJS', u); }
-      }
-      throw new Error('Não foi possível carregar a biblioteca de Excel (SheetJS).');
-    }
+<main class="app">
+  <section class="content">
+    <div class="title">Overview do Projeto</div>
 
-    // ---------- Helpers ----------
-    const REQUIRED_AREAS = ['Dique','Maciço Principal','Miguel Congo','Regreide','Talude 08'];
-    const PRESET_COORDS = {
-      'Dique': [-20, 0, 0, 5],
-      'Maciço Principal': [0, 0, 0, 8],
-      'Miguel Congo': [20, 0, -10, 6],
-      'Regreide': [-10, 0, 10, 4],
-      'Talude 08': [10, 0, 12, 6],
-    };
-    const errBox = document.getElementById('error');
-    function showError(msg){ errBox.style.display='block'; errBox.innerHTML = msg; }
-    const norm = s => (s==null? '': String(s)).normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().trim();
+    <!-- KPIs -->
+    <div class="kpis">
+      <div class="kpi"><div class="caption">Desempenho médio (Real/Planejado)</div><div class="value" id="kpi-desempenho">n/d</div></div>
+      <div class="kpi"><div class="caption">Real médio</div><div class="value" id="kpi-real">n/d</div></div>
+      <div class="kpi"><div class="caption">Planejado médio</div><div class="value" id="kpi-planejado">n/d</div></div>
+    </div>
 
-    async function tryFetchExcel() {
-      const candidates = ['./Base.xlsx','./Base 1.xlsx','./Base1.xlsx','./base.xlsx'];
-      let lastErr; for (const url of candidates){ try { const r = await fetch(url, {cache:'no-store'}); if (r.ok) return await r.arrayBuffer(); lastErr = r.status+':'+url; } catch(e){ lastErr=e; } }
-      throw new Error('Não foi possível baixar a planilha. Coloque <b>Base.xlsx</b> (ou "Base 1.xlsx") na raiz do repositório.');
-    }
+    <!-- Filtros -->
+    <div class="filters">
+      <div class="select"><span class="material-symbols-outlined">calendar_month</span><select id="filter-data"><option value="*">Todos</option></select></div>
+      <div class="select"><span class="material-symbols-outlined">apartment</span><select id="filter-area"><option value="*">Todas</option></select></div>
+      <span id="data-error" style="color:#d33;font-weight:600;"></span>
+    </div>
 
-    function parsePercentNumber(v){
-      if (v==null) return null;
-      if (typeof v === 'number') return v; // 0.85 (85%) ou 85
-      const s = String(v).trim().replace(',', '.');
-      if (s.endsWith('%')) { const n = parseFloat(s.slice(0,-1)); return isNaN(n)? null : (n/100); }
-      const n = parseFloat(s); return isNaN(n)? null : n; // "0.85" => 0.85
-    }
-    function fmtPct(n, digits=1){ return (n==null||!isFinite(n))? 'n/d' : (n*100).toFixed(digits).replace('.',',') + '%'; }
+    <!-- Grid de cards full -->
+    <div class="grid">
+      <div class="card c1">
+        <h4>AVANÇO POR FRENTE DE SERVIÇO</h4>
+        <div style="flex:1;display:grid;place-items:center;color:#9aa;font-weight:600">(placeholder do gráfico)</div>
+      </div>
 
-    function excelSerialToDate(n){ const base = new Date(Date.UTC(1899,11,30)); return new Date(base.getTime() + (Number(n)||0)*86400000); }
-    function parseDateFlexible(v){ if (v==null) return null; if (typeof v==='number') return excelSerialToDate(v); const s=String(v).trim(); const d1=new Date(s); if(!isNaN(d1)) return d1; const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00Z`); const n=parseFloat(s); if(!isNaN(n)) return excelSerialToDate(n); return null; }
+      <div class="card c2">
+        <div class="card-toolbar"><h4>AVANÇO DE OBRA</h4></div>
+        <div class="gauge-wrap"><div class="gauge"><svg viewBox="0 0 200 120">
+          <defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#ef5350"/><stop offset="100%" stop-color="#6c63ff"/></linearGradient></defs>
+          <path d="M10 100 A90 90 0 0 1 190 100" fill="none" stroke="url(#g1)" stroke-width="16" stroke-linecap="round"/>
+          <g id="gauge-needle"><line x1="100" y1="100" x2="100" y2="18" stroke="#4b5563" stroke-width="4"/><circle cx="100" cy="100" r="6" fill="#4b5563"/></g>
+          <text id="gauge-label" x="100" y="112" text-anchor="middle" font-size="20">0%</text>
+        </svg></div></div>
+      </div>
 
-    function objEntriesOrdered(o){ return Object.keys(o).map(k=>[k,o[k]]); }
+      <div class="card c3">
+        <h4>AVANÇO SEMANAL</h4>
+        <div style="flex:1;display:grid;place-items:center;color:#9aa;font-weight:600">(placeholder do gráfico)</div>
+      </div>
 
-    const { THREE, OrbitControls } = await loadThree();
-    const XLSX = await loadSheetJS();
+      <!-- 3D Full-width -->
+      <div class="card c4" id="card-3d">
+        <div class="card-toolbar">
+          <h4>MAPA 3D – Barragem (cor = Desempenho)</h4>
+          <button class="btn" id="btn-full"><span class="material-symbols-outlined">fullscreen</span> Tela cheia</button>
+        </div>
+        <div id="canvas3d"></div>
+      </div>
 
-    // ---------- THREE ----------
-    const canvas = document.getElementById('scene');
-    const renderer = new THREE.WebGLRenderer({canvas, antialias: true}); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b1020);
-    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000); camera.position.set(45,30,45);
-    const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.target.set(0,4,0);
-    scene.add(new THREE.HemisphereLight(0xbfd7ff, 0x0b142a, 1.2)); const dir = new THREE.DirectionalLight(0xffffff,0.9); dir.position.set(30,50,10); dir.castShadow=true; scene.add(dir);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200,200), new THREE.MeshStandardMaterial({color:0x1a203a, roughness:0.95})); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(140,90), new THREE.MeshPhysicalMaterial({color:0x2c6fff, roughness:0.2, transmission:0.75, opacity:0.75, transparent:true})); water.rotation.x=-Math.PI/2; water.position.set(-10,0.05,-10); scene.add(water);
-    const dam = new THREE.Group(); const damBody = new THREE.Mesh(new THREE.BoxGeometry(60,12,20), new THREE.MeshStandardMaterial({color:0x6b6f7a})); damBody.position.set(10,6,0); damBody.rotation.z=THREE.MathUtils.degToRad(-10); damBody.castShadow=true; damBody.receiveShadow=true; dam.add(damBody); const crest = new THREE.Mesh(new THREE.BoxGeometry(60,2,6), new THREE.MeshStandardMaterial({color:0x9aa0a6})); crest.position.set(10,12.5,0); dam.add(crest); scene.add(dam);
+      <div class="card c5">
+        <h4>TIMELINE</h4>
+        <div class="notif" style="color:#556;">• Exemplo de marco – 12/07/2025</div>
+        <div class="notif" style="color:#556;">• Exemplo de marco – 03/08/2025</div>
+        <div class="notif" style="color:#556;">• Exemplo de marco – 17/08/2025</div>
+      </div>
+    </div>
+  </section>
+</main>
 
-    const areaSelect = document.getElementById('areaSelect'); const dateSelect = document.getElementById('dateSelect'); const tooltip = document.getElementById('tooltip');
-    const kpiRatio = document.getElementById('kpiRatio'); const kpiReal = document.getElementById('kpiReal'); const kpiPlan = document.getElementById('kpiPlan');
+<script type="module">
+  import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+  import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-    const markers = new THREE.Group(); scene.add(markers);
-    const sphereGeo = new THREE.SphereGeometry(1.2,32,16); // declarada UMA vez
+  const EXCEL_PATH = './data/Base%202.xlsx';
+  const COL = { data:'Data', area:'Área', real:'Real', planejado:'Planejado', x:'Quantidade', y:'Custo', z:'Número de postos' };
+  const COLOR_GOOD = {h:265,s:70,l:55}, COLOR_BAD = {h:0,s:75,l:55};
 
-    // --- FUNÇÃO DE COR (antes de buildMarkers) ---
-    function colorFromRatio(r){
-      if (r==null || !isFinite(r)) return new THREE.Color(0x95a5a6);
-      const t = (Math.max(0.7, Math.min(1.3, r)) - 0.7) / 0.6; // 0.7->0, 1.3->1
-      const c = new THREE.Color(); c.setHSL(0.0 + t*0.33, 0.85, 0.5);
-      return c;
-    }
+  let allRows=[], filteredRows=[]; let scene,camera,renderer,controls,pointsMesh;
+  const clamp01=v=>Math.max(0,Math.min(1,v)); const lerp=(a,b,t)=>a+(b-a)*t;
+  function ratioColor(r){ const t=clamp01(r); const h=lerp(COLOR_BAD.h,COLOR_GOOD.h,t); const s=lerp(COLOR_BAD.s,COLOR_GOOD.s,t); const l=lerp(COLOR_BAD.l,COLOR_GOOD.l,t); const c=new THREE.Color(); c.setHSL(h/360,s/100,l/100); return c; }
 
-    let ALL_ROWS = []; let HEADERS = [];
-    try {
-      const buf = await tryFetchExcel();
-      const wb = XLSX.read(buf, {type:'array'}); const ws = wb.Sheets[wb.SheetNames[0]]; if (!ws) throw new Error('Planilha vazia.');
-      const asMatrix = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:false});
-      let headerIdx=-1, headerRow=null; for (let i=0;i<Math.min(asMatrix.length, 25); i++){ const r=asMatrix[i]||[]; const normalized=r.map(c=> norm(c)); const hasArea = normalized.some(c=> c.includes('area')); const coverage = normalized.filter(c=>c).length; if (hasArea && coverage>=2){ headerIdx=i; headerRow=r; break; } }
-      if (headerIdx===-1) throw new Error('Cabeçalho não encontrado. A planilha deve conter uma coluna "Área".');
-      HEADERS = headerRow.map(h=> String(h||'').trim());
-      const data = XLSX.utils.sheet_to_json(ws, {header:HEADERS, range: headerIdx+1, defval:null, raw:false});
-      const normToOrig={}; HEADERS.forEach(h=> normToOrig[norm(h)] = h);
-      const keys = Object.keys(normToOrig);
-      const areaKey = 'area' in normToOrig ? 'area' : (keys.find(k=>k.includes('area')) || null);
-      const dateKey = 'data' in normToOrig ? 'data' : (keys.find(k=>k.includes('data')) || null);
-      const realKey = ('real' in normToOrig) ? 'real' : (('real2' in normToOrig) ? 'real2' : (keys.find(k=>k.startsWith('real')) || null));
-      const planKey = ('planejado' in normToOrig) ? 'planejado' : (('previsto' in normToOrig) ? 'previsto' : (keys.find(k=>k.includes('planejad') || k.includes('previst')) || null));
-      const areaName = areaKey? normToOrig[areaKey] : null;
-      const dateName = dateKey? normToOrig[dateKey] : null;
-      const realName = realKey? normToOrig[realKey] : null;
-      const planName = planKey? normToOrig[planKey] : null;
-      if (!areaName) throw new Error('Coluna "Área" não encontrada.');
-      ALL_ROWS = data.map(row=>({ area: row[areaName]? String(row[areaName]).trim():null, date: dateName? parseDateFlexible(row[dateName]) : null, real: realName? parsePercentNumber(row[realName]) : null, plan: planName? parsePercentNumber(row[planName]) : null, all: row })).filter(x=> x.area);
-      for (const a of REQUIRED_AREAS){ if (!ALL_ROWS.some(x=> norm(x.area)===norm(a))) ALL_ROWS.push({area:a, date:null, real:null, plan:null, all:{'Área':a}}); }
-    } catch(e){ console.error(e); showError(e.message + '<br><small>Dica: coloque <b>Base.xlsx</b> (ou "Base 1.xlsx") na raiz do repositório. A primeira aba deve conter uma linha de títulos com uma coluna "Área".</small>'); }
+  function excelSerialToISO(v){ if(v==null||v==='') return null; if(typeof v==='number'){ const utcDays=Math.floor(v-25569); const utcValue=utcDays*86400*1000; const d=new Date(utcValue); const off=d.getTimezoneOffset(); const local=new Date(utcValue+off*60*1000); return local.toISOString().slice(0,10);} const s=String(v).trim(); if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/); if(m){ const[_,dd,mm,yy]=m; const yyyy=yy.length===2?('20'+yy):yy; return `${yyyy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;} return s; }
+  function normalizePerc(n){ if(n==null||n===''||isNaN(n)) return null; const v=Number(n); if(!isFinite(v)) return null; return (v<=1&&v>=0)? v*100 : v; }
 
-    function uniqueDates(){ const s=new Set(); for (const r of ALL_ROWS){ if (r.date){ s.add(r.date.toISOString().slice(0,10)); } } return Array.from(s).sort(); }
-    function uniqueAreas(){ const s=new Set(REQUIRED_AREAS); for (const r of ALL_ROWS){ if (r.area) s.add(r.area);} return Array.from(s); }
+  async function loadExcel(path){ const res=await fetch(path); if(!res.ok) throw new Error('Falha ao baixar Excel: '+res.status); const ab=await res.arrayBuffer(); const wb=XLSX.read(ab,{type:'array'}); const sheet=wb.Sheets[wb.SheetNames[0]]; return XLSX.utils.sheet_to_json(sheet,{defval:null}); }
 
-    function buildSelectors(){ dateSelect.innerHTML='<option value="Todos">Todos</option>'+uniqueDates().map(d=>`<option value="${d}">${d}</option>`).join(''); areaSelect.innerHTML='<option value="Todos">Todos</option>'+uniqueAreas().map(a=>`<option value="${a}">${a}</option>`).join(''); }
+  function preprocessRows(rows){ const areaKey=rows.length&&rows[0].hasOwnProperty(COL.area)? COL.area : 'Area'; return rows.map((r,idx)=>{ const dateISO=excelSerialToISO(r[COL.data]); const real=normalizePerc(r[COL.real]); const plan=normalizePerc(r[COL.planejado]); let x=Number(r[COL.x]); if(!isFinite(x)) x=idx*5; let y=Number(r[COL.y]); if(!isFinite(y)) y=(real??0)-(plan??0); let z=Number(r[COL.z]); if(!isFinite(z)) z=(plan??50); return {...r, __area:r[areaKey], __dateKey:dateISO||String(r[COL.data]??''), __real:isFinite(real)?real:null, __plan:isFinite(plan)?plan:null, __x:x, __y:y, __z:z}; }); }
 
-    function aggregateForDate(selDate){ const byArea=new Map(); for(const r of ALL_ROWS){ const d=r.date; if(selDate!=='Todos' && d && d.toISOString().slice(0,10)!==selDate) continue; const prev=byArea.get(r.area); if(!prev) byArea.set(r.area, r); else { if(!prev.date && d) byArea.set(r.area, r); else if(prev.date && d && d>prev.date) byArea.set(r.area, r);} } for (const a of REQUIRED_AREAS){ if(!byArea.has(a)) byArea.set(a,{area:a,date:null,real:null,plan:null,all:{'Área':a}});} return Array.from(byArea.values()); }
+  function populateFilters(rows){ const sd=document.getElementById('filter-data'), sa=document.getElementById('filter-area'); const datas=[...new Set(rows.map(r=>r.__dateKey).filter(Boolean))].sort(); const areas=[...new Set(rows.map(r=>r.__area).filter(Boolean))].sort(); sd.innerHTML='<option value="*">Todos</option>'+datas.map(d=>`<option value="${d}">${d}</option>`).join(''); sa.innerHTML='<option value="*">Todas</option>'+areas.map(a=>`<option value="${a}">${a}</option>`).join(''); }
 
-    function updateKPI(rows){ const ratios=rows.map(r=> (r.real!=null&&r.plan)? (r.plan!==0? r.real/r.plan:null):null).filter(x=>x!=null&&isFinite(x)); const reals=rows.map(r=>r.real).filter(x=>x!=null&&isFinite(x)); const plans=rows.map(r=>r.plan).filter(x=>x!=null&&isFinite(x)); const mean=a=>a.length? a.reduce((p,c)=>p+c,0)/a.length:null; kpiRatio.textContent=fmtPct(mean(ratios)); kpiReal.textContent=fmtPct(mean(reals)); kpiPlan.textContent=fmtPct(mean(plans)); }
+  function applyFilters(){ const d=document.getElementById('filter-data').value; const a=document.getElementById('filter-area').value; filteredRows=allRows.filter(r=> (d==='*'||r.__dateKey===d) && (a==='*'||r.__area===a) ); updateKPIs(filteredRows); drawPoints(filteredRows); }
 
-    const areaToObject = new Map();
-    function buildMarkers(selDate='Todos', selArea='Todos'){ while(markers.children.length) markers.remove(markers.children[0]); areaToObject.clear(); const rows=aggregateForDate(selDate).filter(r=> selArea==='Todos'? true : r.area===selArea); for (const d of rows){ const coords=PRESET_COORDS[d.area] || [0,0,0,5]; const [x,y,z,h]=coords; const ratio=(d.real!=null&&d.plan)?(d.plan!==0? d.real/d.plan:null):null; const mat=new THREE.MeshStandardMaterial({color: colorFromRatio(ratio), roughness:0.4}); const mesh=new THREE.Mesh(sphereGeo, mat); mesh.position.set(x,h,z); mesh.castShadow=true; mesh.userData={...d, ratio, height:h}; const ped=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,h,12), new THREE.MeshStandardMaterial({color:0x3a466f, roughness:0.9})); ped.position.set(x,h/2,z); ped.castShadow=true; ped.receiveShadow=true; markers.add(ped); markers.add(mesh); areaToObject.set(d.area, mesh);} updateKPI(rows); }
+  function updateKPIs(rows){ const elPerf=document.getElementById('kpi-desempenho'); const elReal=document.getElementById('kpi-real'); const elPlan=document.getElementById('kpi-planejado'); if(!rows.length){ elPerf.textContent=elReal.textContent=elPlan.textContent='n/d'; drawGauge(0); return; } const vals=rows.filter(r=>r.__real!=null && r.__plan!=null && r.__plan!==0); if(!vals.length){ elPerf.textContent=elReal.textContent=elPlan.textContent='n/d'; drawGauge(0); return; } const avgReal=vals.reduce((s,r)=>s+r.__real,0)/vals.length; const avgPlan=vals.reduce((s,r)=>s+r.__plan,0)/vals.length; const ratio=avgPlan? (avgReal/avgPlan) : 0; elReal.textContent=avgReal.toFixed(1)+'%'; elPlan.textContent=avgPlan.toFixed(1)+'%'; elPerf.textContent=(ratio*100).toFixed(1)+'%'; drawGauge(clamp01(ratio)); }
 
-    const raycaster=new THREE.Raycaster(); const mouse=new THREE.Vector2(); function onPointerMove(e){ const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y=-((e.clientY-rect.top)/rect.height)*2+1; raycaster.setFromCamera(mouse, camera); const it=raycaster.intersectObjects(markers.children,true).filter(i=> i.object.geometry===sphereGeo); if(it.length){ const d=it[0].object.userData; tooltip.style.left=e.clientX+'px'; tooltip.style.top=e.clientY+'px'; tooltip.style.opacity=1; tooltip.innerHTML=(function buildTooltip(){ const entries=objEntriesOrdered(d.all||{}); let rows=''; const important=new Set(['area','data','real','real2','planejado','previsto']); for (const [k,v] of entries){ if(k==null||String(k).trim()==='') continue; const nk=norm(k); let vv=v; if(important.has(nk)){ const num=parsePercentNumber(v); vv=(num==null)? v : fmtPct(num); } rows += `<tr><td>${k}</td><td><b>${vv==null? 'n/d' : vv}</b></td></tr>`; } if(!entries.length){ const ds=d.date? d.date.toISOString().slice(0,10) : 'n/d'; rows += `<tr><td>Área</td><td><b>${d.area}</b></td></tr>`; rows += `<tr><td>Data</td><td><b>${ds}</b></td></tr>`; rows += `<tr><td>Real</td><td><b>${fmtPct(d.real)}</b></td></tr>`; rows += `<tr><td>Planejado</td><td><b>${fmtPct(d.plan)}</b></td></tr>`; } return `<table>${rows}</table>`; })(); } else tooltip.style.opacity=0; }
-    renderer.domElement.addEventListener('pointermove', onPointerMove);
+  function drawGauge(t){ const needle=document.getElementById('gauge-needle'); const label=document.getElementById('gauge-label'); const angle=180+(0-180)*t; needle.setAttribute('transform',`rotate(${angle} 100 100)`); label.textContent=Math.round(t*100)+'%'; }
 
-    document.getElementById('btnFullscreen').addEventListener('click', async ()=>{ const el=document.getElementById('app'); if(!document.fullscreenElement){ try{ await el.requestFullscreen(); }catch{} } else { await document.exitFullscreen(); } });
+  // THREE
+  let scene,camera,renderer,controls,pointsMesh;
+  function init3D(){ const c=document.getElementById('canvas3d'); scene=new THREE.Scene(); scene.background=new THREE.Color(0xf7f8fb); const W=c.clientWidth,H=c.clientHeight; camera=new THREE.PerspectiveCamera(55,W/H,0.1,10000); camera.position.set(200,200,200); renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(W,H); c.innerHTML=''; c.appendChild(renderer.domElement); const hemi=new THREE.HemisphereLight(0xffffff,0x444466,0.8); scene.add(hemi); const dir=new THREE.DirectionalLight(0xffffff,0.8); dir.position.set(200,300,400); scene.add(dir); controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true; scene.add(new THREE.GridHelper(400,10,0xccccff,0xeeeeff)); const axes=new THREE.AxesHelper(120); axes.material.depthTest=false; axes.renderOrder=2; scene.add(axes); window.addEventListener('resize',onResize); animate(); }
+  function onResize(){ const c=document.getElementById('canvas3d'); const W=c.clientWidth,H=c.clientHeight; camera.aspect=W/H; camera.updateProjectionMatrix(); renderer.setSize(W,H); }
+  function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
 
-    function resize(){ const w=window.innerWidth, h=window.innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); } window.addEventListener('resize', resize); resize(); (function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); })();
+  function drawPoints(rows){ if(pointsMesh){ scene.remove(pointsMesh); pointsMesh.geometry.dispose(); pointsMesh.material.dispose(); pointsMesh=null; } if(!rows.length) return; const xs=rows.map(r=>r.__x), ys=rows.map(r=>r.__y), zs=rows.map(r=>r.__z); const min=(a)=>a.reduce((m,v)=>v<m?v:m,a[0]); const max=(a)=>a.reduce((m,v)=>v>m?v:m,a[0]); const minX=min(xs), maxX=max(xs), minY=min(ys), maxY=max(ys), minZ=min(zs), maxZ=max(zs); const span=(n)=> (n==0?1:n); const spanX=span(maxX-minX), spanY=span(maxY-minY), spanZ=span(maxZ-minZ); const positions=[], colors=[]; rows.forEach(r=>{ const {__x:x0,__y:y0,__z:z0,__real:real,__plan:plan}=r; if(![x0,y0,z0].every(v=>Number.isFinite(v))||plan==null||plan===0) return; const x=((x0-minX)/spanX-0.5)*200; const y=((y0-minY)/spanY-0.5)*200; const z=((z0-minZ)/spanZ-0.5)*200; positions.push(x,y,z); const c=ratioColor((real??0)/plan); colors.push(c.r,c.g,c.b); }); const geom=new THREE.BufferGeometry(); geom.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(positions),3)); geom.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colors),3)); const mat=new THREE.PointsMaterial({size:6,vertexColors:true,opacity:.95,transparent:true}); pointsMesh=new THREE.Points(geom,mat); scene.add(pointsMesh); }
 
-    areaSelect.addEventListener('change', ()=>{ buildMarkers(dateSelect.value, areaSelect.value); focusCamera(); }); dateSelect.addEventListener('change', ()=>{ buildMarkers(dateSelect.value, areaSelect.value); });
-    function focusCamera(){ const val=areaSelect.value; if(val!=='Todos' && areaToObject.has(val)){ const obj=areaToObject.get(val); controls.target.copy(obj.position); camera.position.lerp(new THREE.Vector3(obj.position.x+25, obj.position.y+12, obj.position.z+25), 0.2);} else { controls.target.set(0,4,0); camera.position.set(45,30,45);} }
+  function toggleFullscreen(){ const card=document.getElementById('card-3d'); if(!document.fullscreenElement) card.requestFullscreen?.(); else document.exitFullscreen?.(); setTimeout(onResize,300); }
 
-    // Inicializa após carregar os dados
-    buildSelectors(); buildMarkers('Todos','Todos');
-  </script>
+  async function boot(){ init3D(); try{ const raw=await loadExcel(EXCEL_PATH); allRows=preprocessRows(raw); populateFilters(allRows); applyFilters(); }catch(err){ console.error(err); document.getElementById('data-error').textContent='Não foi possível carregar o Excel. Verifique caminho e publicação.'; } document.getElementById('filter-data').addEventListener('change', applyFilters); document.getElementById('filter-area').addEventListener('change', applyFilters); document.getElementById('btn-full').addEventListener('click', toggleFullscreen); }
+  window.addEventListener('DOMContentLoaded', boot);
+</script>
 </body>
 </html>
