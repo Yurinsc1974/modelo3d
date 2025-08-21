@@ -70,7 +70,7 @@
   <header class="topbar">
     <div class="brand">
       <div class="menu-btn"><span class="material-symbols-outlined">menu</span></div>
-      <div>SITUAÇÃO ATUAL - BARRAGEM DE DOUTOR</div>
+      <div>Gestão de Projeto | Barragem de Doutor</div>
     </div>
     <div class="actions" style="display:flex; gap:8px; align-items:center;">
       <button class="icon-btn"><span class="material-symbols-outlined">lock</span></button>
@@ -83,7 +83,7 @@
 
   <main class="app">
     <section class="content">
-      <div class="title">Overview do Projeto</div>
+      <div class="title">Avanço das Frentes - Barragem de Doutor</div>
 
       <div class="kpis">
         <div class="kpi"><div class="caption">Desempenho médio (Real/Planejado)</div><div class="value" id="kpi-desempenho">n/d</div></div>
@@ -128,7 +128,8 @@
           <div id="canvas3d"></div>
         </div>
 
-        <div class="card c5"><h4>TIMELINE</h4>
+        <div class="card c5">
+          <h4>TIMELINE</h4>
           <div class="notif" style="color:#556;">• Exemplo de marco – 12/07/2025</div>
           <div class="notif" style="color:#556;">• Exemplo de marco – 03/08/2025</div>
           <div class="notif" style="color:#556;">• Exemplo de marco – 17/08/2025</div>
@@ -143,26 +144,24 @@
 
   // ================== CONFIG ==================
   const EXCEL_FILE = 'base.xlsm';
-  const REPO   = 'Yurinsc1974/modelo3d';  // ajuste se mudar o repo
+  const REPO   = 'Yurinsc1974/modelo3d';
   const BRANCH = 'main';
 
   const RELATIVE_PATH = `./data/${encodeURIComponent(EXCEL_FILE)}?v=${Date.now()}`;
   const RAW_PATH = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/data/${encodeURIComponent(EXCEL_FILE)}?v=${Date.now()}`;
 
-  const COL = { // mapeie aqui seus cabeçalhos do Excel
+  const COL = {
     data:'Data', area:'Área', real:'Real', planejado:'Planejado',
     x:'Quantidade', y:'Custo', z:'Número de postos'
   };
 
   // ============= APP isolado (sem globais) =============
   function createApp(){
-    // ----- estado -----
     let allRows = []; let filteredRows = [];
 
-    // ----- three.js (escopo fechado) -----
+    // three.js mantido em escopo fechado
     let scene, camera, renderer, controls, pointsMesh;
 
-    // helpers
     const clamp01=v=>Math.max(0,Math.min(1,v));
     const lerp=(a,b,t)=>a+(b-a)*t;
     const COLOR_GOOD={h:265,s:70,l:55}, COLOR_BAD={h:0,s:75,l:55};
@@ -172,9 +171,8 @@
       const res = await fetch(path);
       if(!res.ok) throw new Error(`HTTP ${res.status} ao baixar ${path}`);
       const ab = await res.arrayBuffer();
-      const wb = XLSX.read(ab, { type:'array' }); // SheetJS lê xlsm
+      const wb = XLSX.read(ab, { type:'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      // detecta linha de cabeçalho (Data + Área/Area)
       const rowsArr = XLSX.utils.sheet_to_json(sheet, { header:1, defval:null, raw:true });
       const hdrIdx = rowsArr.findIndex(r => Array.isArray(r) &&
         r.some(v=>String(v||'').trim()==='Data') &&
@@ -192,7 +190,18 @@
     function excelSerialToISO(v){ if(v==null||v==='') return null; if(typeof v==='number'){ const utcDays=Math.floor(v-25569); const utcValue=utcDays*86400*1000; const d=new Date(utcValue); const off=d.getTimezoneOffset(); const local=new Date(utcValue+off*60*1000); return local.toISOString().slice(0,10);} const s=String(v).trim(); if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/); if(m){ const[_,dd,mm,yy]=m; const yyyy=yy.length===2?('20'+yy):yy; return `${yyyy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;} return s; }
     function normalizePerc(n){ if(n==null||n===''||isNaN(n)) return null; const v=Number(n); if(!isFinite(v)) return null; return (v<=1&&v>=0)? v*100 : v; }
 
-    function preprocessRows(rows){ const areaKey = rows.length && rows[0].hasOwnProperty(COL.area) ? COL.area : 'Area'; return rows.map((r,idx)=>{ const dateISO=excelSerialToISO(r[COL.data]); const real=normalizePerc(r[COL.real]); const plan=normalizePerc(r[COL.planejado]); let x=Number(r[COL.x]); if(!isFinite(x)) x=idx*5; let y=Number(r[COL.y]); if(!isFinite(y)) y=(real??0)-(plan??0); let z=Number(r[COL.z]); if(!isFinite(z)) z=(plan??50); return {...r, __area:r[areaKey], __dateKey:dateISO||String(r[COL.data]??''), __real:isFinite(real)?real:null, __plan:isFinite(plan)?plan:null, __x:x, __y:y, __z:z}; }); }
+    function preprocessRows(rows){
+      const areaKey = rows.length && rows[0].hasOwnProperty(COL.area) ? COL.area : 'Area';
+      return rows.map((r,idx)=>{
+        const dateISO=excelSerialToISO(r[COL.data]);
+        const real=normalizePerc(r[COL.real]);
+        const plan=normalizePerc(r[COL.planejado]);
+        let x=Number(r[COL.x]); if(!isFinite(x)) x=idx*5;
+        let y=Number(r[COL.y]); if(!isFinite(y)) y=(real??0)-(plan??0);
+        let z=Number(r[COL.z]); if(!isFinite(z)) z=(plan??50);
+        return {...r, __area:r[areaKey], __dateKey:dateISO||String(r[COL.data]??''), __real:isFinite(real)?real:null, __plan:isFinite(plan)?plan:null, __x:x, __y:y, __z:z};
+      });
+    }
 
     function populateFilters(rows){ const sd=document.getElementById('filter-data'), sa=document.getElementById('filter-area'); const datas=[...new Set(rows.map(r=>r.__dateKey).filter(Boolean))].sort(); const areas=[...new Set(rows.map(r=>r.__area).filter(Boolean))].sort(); sd.innerHTML='<option value="*">Todos</option>'+datas.map(d=>`<option value="${d}">${d}</option>`).join(''); sa.innerHTML='<option value="*">Todas</option>'+areas.map(a=>`<option value="${a}">${a}</option>`).join(''); }
 
