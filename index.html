@@ -1,44 +1,41 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>modelo3d – Loader de Excel (fix v2)</title>
-  <meta http-equiv="Cache-Control" content="no-store" />
-  <style>
-    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:24px}
-    code, pre{background:#f6f8fa; padding:2px 4px; border-radius:4px}
-    #log{white-space:pre-wrap; border:1px solid #ddd; padding:12px; border-radius:8px; background:#fafafa; max-height:40vh; overflow:auto}
-  </style>
+  <meta charset="UTF-8">
+  <title>Teste Excel</title>
 </head>
 <body>
-  <h1>Modelo3D – Demo de carregamento de <code>data/Base.xlsx</code></h1>
-  <p>Exemplo pronto para GitHub Pages. Clique em <em>Carregar Excel</em> para testar.</p>
+  <h1>Teste de Leitura de Excel</h1>
   <button id="btn">Carregar Excel</button>
-  <div id="log" aria-live="polite"></div>
+  <pre id="log"></pre>
 
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
-  <script src="js/loadExcel.js"></script>
+  <!-- XLSX sem SRI -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
+          crossorigin="anonymous"
+          defer></script>
+
+  <!-- Loader -->
+  <script src="js/loadExcel.js" defer></script>
+
   <script>
-  const log = (msg)=>{ const el = document.getElementById('log'); el.textContent += msg + "
-"; console.log(msg); };
+    const log = (msg)=>{ const el = document.getElementById('log'); el.textContent += msg + "\n"; console.log(msg); };
 
-  document.getElementById('btn').addEventListener('click', async()=>{
-    log('Iniciando leitura do Excel…');
-    try{
-      const wb = await loadExcelSmart({
-        relativePath: 'data/Base.xlsx',
-        cacheBust: true
-      });
-      log('Workbook carregado com sucesso. Abas: ' + wb.SheetNames.join(', '));
-      const first = wb.SheetNames[0];
-      const json = XLSX.utils.sheet_to_json(wb.Sheets[first]);
-      log('Primeiras linhas:');
-      log(JSON.stringify(json.slice(0,5), null, 2));
-    }catch(err){
-      log('Falha ao carregar: ' + err.message);
-    }
-  });
+    document.getElementById('btn').addEventListener('click', async ()=>{
+      log('Iniciando leitura do Excel…');
+      try{
+        const wb = await loadExcelSmart({
+          relativePath: 'data/Base.xlsx',
+          cacheBust: true
+        });
+        log('Workbook carregado com sucesso. Abas: ' + wb.SheetNames.join(', '));
+        const first = wb.SheetNames[0];
+        const json = XLSX.utils.sheet_to_json(wb.Sheets[first]);
+        log('Primeiras linhas:');
+        log(JSON.stringify(json.slice(0,5), null, 2));
+      }catch(err){
+        log('Falha ao carregar: ' + err.message);
+      }
+    });
   </script>
 </body>
 </html>
