@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>modelo3d – Loader de Excel (fix)</title>
+  <title>modelo3d – Loader de Excel (fix v2)</title>
   <meta http-equiv="Cache-Control" content="no-store" />
   <style>
     body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:24px}
@@ -13,11 +13,11 @@
 </head>
 <body>
   <h1>Modelo3D – Demo de carregamento de <code>data/Base.xlsx</code></h1>
-  <p>Este exemplo está pronto para GitHub Pages e evita erros <code>404</code> resolvendo corretamente o caminho do arquivo.</p>
+  <p>Exemplo pronto para GitHub Pages. Clique em <em>Carregar Excel</em> para testar.</p>
   <button id="btn">Carregar Excel</button>
   <div id="log" aria-live="polite"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha256-aWcL8vQwUo4x8r8u5mZ8k6ZSc3b7S2qQOAgYz5+f8j0=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
   <script src="js/loadExcel.js"></script>
   <script>
   const log = (msg)=>{ const el = document.getElementById('log'); el.textContent += msg + "

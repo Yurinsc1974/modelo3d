@@ -14,13 +14,12 @@ ${text.slice(0,200)}` : '');
 function getPagesBaseUrl(){
   const {origin, pathname, hostname} = window.location;
   const segs = pathname.split('/').filter(Boolean);
-  // Ex.: https://usuario.github.io/repositorio/… -> base "https://usuario.github.io/repositorio/"
+  // Ex.: https://usuario.github.io/repositorio/... -> base "https://usuario.github.io/repositorio/"
   if(hostname.endsWith('github.io') && segs.length){
     return `${origin}/${segs[0]}/`;
   }
   // Ex.: desenvolvimento local: http://127.0.0.1:5500/subpasta/index.html
-  return origin + pathname.replace(/\/[^
-/]*$/, '/');
+  return origin + pathname.replace(/\/[^\/]*$/, '/');
 }
 
 function buildUrlRelative(rel){
