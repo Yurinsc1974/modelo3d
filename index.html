@@ -1,298 +1,44 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Avanço de Obra – Barragem</title>
-
-  <!-- Fonts e libs -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-  <!-- Material Symbols (Outlined) com eixos de variação completos -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,200..700,0..1,-50..200" />
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.20.1/dist/xlsx.full.min.js" defer></script>
-
-  <!-- Import Map para resolver 'three' e 'three/examples/jsm/*' -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-    }
-  }
-  </script>
-
+  <title>modelo3d – Loader de Excel (fix)</title>
+  <meta http-equiv="Cache-Control" content="no-store" />
   <style>
-    :root{
-      --bg:#f3f4f8; --card:#ffffff; --muted:#6e6e7b; --text:#2a2a33;
-      --accent:#6c63ff; --shadow:0 10px 25px rgba(17,24,39,0.08); --radius:16px;
-      --header-h:64px; --page-pad:20px;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-    /* Material Symbols - garantir eixos */
-    .material-symbols-outlined{
-      font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
-      font-size: 22px;
-      line-height: 1;
-    }
-    /* Topbar */
-    .topbar{height:var(--header-h);display:flex;align-items:center;justify-content:space-between;padding:0 var(--page-pad);background:#fff;box-shadow:var(--shadow);position:sticky;top:0;z-index:5}
-    .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.5px}
-    .menu-btn,.icon-btn{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:#fff;border:1px solid #e7e9f4;box-shadow:none}
-    .user{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:999px;background:linear-gradient(135deg,#eef 0%,#fff 100%);box-shadow:inset 0 0 0 1px #e8e8f3}
-    /* Layout full width */
-    .app{display:block;padding:var(--page-pad)}
-    .content{display:grid;gap:20px}
-    .title{font-size:20px;font-weight:700;margin:4px 4px 0}
-    .grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:minmax(150px,auto);gap:20px}
-    .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:12px}
-    .card h4{margin:0;font-size:14px;color:#5a5a66;font-weight:600}
-    .kpis{display:flex;gap:16px;flex-wrap:wrap}
-    .kpi{flex:1 1 220px;background:linear-gradient(180deg,#fff 0%,#fafbff 100%);border-radius:14px;padding:14px;box-shadow:inset 0 0 0 1px #eef1ff}
-    .kpi .value{font-size:22px;font-weight:800;color:#2e2e3b}
-    .kpi .caption{font-size:12px;color:var(--muted)}
-    .c1{grid-column:span 4}
-    .c2{grid-column:span 4}
-    .c3{grid-column:span 4}
-    .c4{grid-column:span 12;height:520px}
-    .c5{grid-column:span 12}
-    .filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-    .select{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#f7f8ff;border-radius:10px;border:1px solid #e6e8ff;color:#444}
-    select{border:none;background:transparent;outline:none;font-weight:600;color:#333}
-    .gauge-wrap{display:flex;align-items:center;justify-content:center;height:200px}
-    .gauge svg{width:100%;max-width:420px}
-    .gauge text{font-weight:800;fill:#333}
-    #canvas3d{position:relative;flex:1;min-height:360px;border-radius:12px;overflow:hidden;background:radial-gradient(ellipse at top left,#f8f9ff,#f3f4f8)}
-    .card-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px}
-    .btn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;background:var(--accent);color:#fff;padding:8px 12px;border-radius:10px;font-weight:600;box-shadow:0 6px 16px rgba(108,99,255,.25)}
-    @media (max-width:1200px){
-      .grid{grid-template-columns:repeat(6,1fr)}
-      .c1,.c2,.c3{grid-column:span 6}
-      .c4,.c5{grid-column:span 6}
-    }
-    @media (max-width:800px){
-      .grid{grid-template-columns:repeat(1,1fr)}
-      .c1,.c2,.c3,.c4,.c5{grid-column:span 1}
-      .c4{height:360px}
-    }
+    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:24px}
+    code, pre{background:#f6f8fa; padding:2px 4px; border-radius:4px}
+    #log{white-space:pre-wrap; border:1px solid #ddd; padding:12px; border-radius:8px; background:#fafafa; max-height:40vh; overflow:auto}
   </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <button class="menu-btn" title="Menu"><span class="material-symbols-outlined">menu</span></button>
-    <div>Gestão de Projeto – Barragem de Doutor</div>
-  </div>
-  <div class="actions" style="display:flex; gap:8px; align-items:center;">
-    <button class="icon-btn" title="Bloquear"><span class="material-symbols-outlined">lock</span></button>
-    <button class="icon-btn" title="Adicionar pessoa"><span class="material-symbols-outlined">person_add</span></button>
-    <button class="icon-btn" title="Configurações"><span class="material-symbols-outlined">settings</span></button>
-    <button class="icon-btn" title="Baixar arquivo"><span class="material-symbols-outlined">file_download</span></button>
-    <div class="user"><span class="material-symbols-outlined">account_circle</span><strong>&nbsp;Yuri</strong></div>
-  </div>
-</header>
+  <h1>Modelo3D – Demo de carregamento de <code>data/Base.xlsx</code></h1>
+  <p>Este exemplo está pronto para GitHub Pages e evita erros <code>404</code> resolvendo corretamente o caminho do arquivo.</p>
+  <button id="btn">Carregar Excel</button>
+  <div id="log" aria-live="polite"></div>
 
-<main class="app">
-<section class="content">
-  <div class="title">Avanço das Frentes - Barragem de Doutor</div>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha256-aWcL8vQwUo4x8r8u5mZ8k6ZSc3b7S2qQOAgYz5+f8j0=" crossorigin="anonymous"></script>
+  <script src="js/loadExcel.js"></script>
+  <script>
+  const log = (msg)=>{ const el = document.getElementById('log'); el.textContent += msg + "
+"; console.log(msg); };
 
-  <div class="kpis">
-    <div class="kpi"><div class="caption">Desempenho médio (Real/Planejado)</div><div class="value" id="kpi-desempenho">n/d</div></div>
-    <div class="kpi"><div class="caption">Real médio</div><div class="value" id="kpi-real">n/d</div></div>
-    <div class="kpi"><div class="caption">Planejado médio</div><div class="value" id="kpi-planejado">n/d</div></div>
-  </div>
-
-  <div class="filters">
-    <div class="select"><span class="material-symbols-outlined" title="Data">calendar_month</span>
-      <select id="filter-data"><option value="*">Todos</option></select>
-    </div>
-    <div class="select"><span class="material-symbols-outlined" title="Área">apartment</span>
-      <select id="filter-area"><option value="*">Todas</option></select>
-    </div>
-    <span id="data-error" style="color:#d33;font-weight:600;"></span>
-  </div>
-
-  <div class="grid">
-    <div class="card c1"><h4>AVANÇO POR FRENTE DE SERVIÇO</h4>
-      <div style="flex:1;display:grid;place-items:center;color:#9aa;font-weight:600">(placeholder do gráfico)</div>
-    </div>
-
-    <div class="card c2">
-      <div class="card-toolbar"><h4>AVANÇO DE OBRA</h4></div>
-      <div class="gauge-wrap"><div class="gauge">
-        <svg viewBox="0 0 200 120">
-          <defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#ef5350"/><stop offset="100%" stop-color="#6c63ff"/></linearGradient></defs>
-          <path d="M10 100 A90 90 0 0 1 190 100" fill="none" stroke="url(#g1)" stroke-width="16" stroke-linecap="round"/>
-          <g id="gauge-needle"><line x1="100" y1="100" x2="100" y2="18" stroke="#4b5563" stroke-width="4"/><circle cx="100" cy="100" r="6" fill="#4b5563"/></g>
-          <text id="gauge-label" x="100" y="112" text-anchor="middle" font-size="20">0%</text>
-        </svg>
-      </div></div>
-    </div>
-
-    <div class="card c3"><h4>AVANÇO SEMANAL</h4>
-      <div style="flex:1;display:grid;place-items:center;color:#9aa;font-weight:600">(placeholder do gráfico)</div>
-    </div>
-
-    <div class="card c4" id="card-3d">
-      <div class="card-toolbar">
-        <h4>MAPA 3D – Barragem (cor = Desempenho)</h4>
-        <button class="btn" id="btn-full"><span class="material-symbols-outlined">fullscreen</span> Tela cheia</button>
-      </div>
-      <div id="canvas3d"></div>
-    </div>
-
-    <div class="card c5">
-      <h4>TIMELINE</h4>
-      <div class="notif" style="color:#556;">• Exemplo de marco – 12/07/2025</div>
-      <div class="notif" style="color:#556;">• Exemplo de marco – 03/08/2025</div>
-      <div class="notif" style="color:#556;">• Exemplo de marco – 17/08/2025</div>
-    </div>
-  </div>
-</section>
-</main>
-
-<!-- App - módulo -->
-<script type="module">
-  import * as THREE from 'three';
-  import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-
-  // ================== CONFIG ==================
-  const EXCEL_FILE = 'Base.xlsx';
-  const REPO  = 'Yurinsc1974/modelo3d';
-  const BRANCH = 'main';
-  const RELATIVE_PATH = `./data/${encodeURIComponent(EXCEL_FILE)}?v=${Date.now()}`;
-  const RAW_PATH = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/data/${encodeURIComponent(EXCEL_FILE)}?v=${Date.now()}`;
-  const COL = {
-    data:'Data', area:'Área', real:'Real', planejado:'Planejado',
-    x:'Quantidade', y:'Custo', z:'Número de postos'
-  };
-
-  function createApp(){
-    let allRows = []; let filteredRows = [];
-    let scene, camera, renderer, controls, pointsMesh;
-
-    const clamp01=v=>Math.max(0,Math.min(1,v));
-    const lerp=(a,b,t)=>a+(b-a)*t;
-    const COLOR_GOOD={h:265,s:70,l:55}, COLOR_BAD={h:0,s:75,l:55};
-    function ratioColor(r){ const t=clamp01(r); const h=lerp(COLOR_BAD.h,COLOR_GOOD.h,t); const s=lerp(COLOR_BAD.s,COLOR_GOOD.s,t); const l=lerp(COLOR_BAD.l,COLOR_GOOD.l,t); const c=new THREE.Color(); c.setHSL(h/360,s/100,l/100); return c; }
-
-    async function loadExcel(path){
-      const res = await fetch(path);
-      if(!res.ok) throw new Error(`HTTP ${res.status} ao baixar ${path}`);
-      const ab = await res.arrayBuffer();
-      const wb = XLSX.read(ab, { type:'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rowsArr = XLSX.utils.sheet_to_json(sheet, { header:1, defval:null, raw:true });
-      const hdrIdx = rowsArr.findIndex(r => Array.isArray(r) &&
-        r.some(v=>String(v??'').trim()==='Data') &&
-        (r.some(v=>String(v??'').trim()==='Área') || r.some(v=>String(v??'').trim()==='Area'))
-      );
-      const json = XLSX.utils.sheet_to_json(sheet, { defval:null, ...(hdrIdx>=0?{range:hdrIdx}:{}) });
-      if(!Array.isArray(json) || json.length===0) throw new Error('Planilha vazia ou cabeçalho não encontrado.');
-      return json;
-    }
-    async function loadExcelSmart(){
-      try{ return await loadExcel(RELATIVE_PATH); }
-      catch(e){ console.warn('Falhou relativo; tentando RAW', e); return await loadExcel(RAW_PATH); }
-    }
-    function excelSerialToISO(v){ if(v==null || v==='') return null; if(typeof v==='number'){ const utcDays=Math.floor(v-25569); const utcValue=utcDays*86400*1000; const d=new Date(utcValue); const off=d.getTimezoneOffset(); const local=new Date(utcValue+off*60*1000); return local.toISOString().slice(0,10);} const s=String(v).trim(); if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/); if(m){ const[,dd,mm,yy]=m; const yyyy=yy.length===2?('20'+yy):yy; return `${yyyy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;} return s; }
-    function normalizePerc(n){ if(n==null || n==='' || isNaN(n)) return null; const v=Number(n); if(!isFinite(v)) return null; return (v<=1&&v>=0)? v*100 : v; }
-    function preprocessRows(rows){
-      const areaKey = rows.length && rows[0].hasOwnProperty(COL.area) ? COL.area : 'Area';
-      return rows.map((r,idx)=>{
-        const dateISO=excelSerialToISO(r[COL.data]);
-        const real=normalizePerc(r[COL.real]);
-        const plan=normalizePerc(r[COL.planejado]);
-        let x=Number(r[COL.x]); if(!isFinite(x)) x=idx*5;
-        let y=Number(r[COL.y]); if(!isFinite(y)) y=(real??0)-(plan??0);
-        let z=Number(r[COL.z]); if(!isFinite(z)) z=(plan??50);
-        return {...r, __area:r[areaKey], __dateKey:dateISO ?? String(r[COL.data]??''), __real:isFinite(real)?real:null, __plan:isFinite(plan)?plan:null, __x:x, __y:y, __z:z};
+  document.getElementById('btn').addEventListener('click', async()=>{
+    log('Iniciando leitura do Excel…');
+    try{
+      const wb = await loadExcelSmart({
+        relativePath: 'data/Base.xlsx',
+        cacheBust: true
       });
+      log('Workbook carregado com sucesso. Abas: ' + wb.SheetNames.join(', '));
+      const first = wb.SheetNames[0];
+      const json = XLSX.utils.sheet_to_json(wb.Sheets[first]);
+      log('Primeiras linhas:');
+      log(JSON.stringify(json.slice(0,5), null, 2));
+    }catch(err){
+      log('Falha ao carregar: ' + err.message);
     }
-    function populateFilters(rows){ const sd=document.getElementById('filter-data'), sa=document.getElementById('filter-area'); const datas=[...new Set(rows.map(r=>r.__dateKey).filter(Boolean))].sort(); const areas=[...new Set(rows.map(r=>r.__area).filter(Boolean))].sort(); sd.innerHTML='<option value="*">Todos</option>'+datas.map(d=>`<option value="${d}">${d}</option>`).join(''); sa.innerHTML='<option value="*">Todas</option>'+areas.map(a=>`<option value="${a}">${a}</option>`).join(''); }
-    function updateKPIs(rows){ const elPerf=document.getElementById('kpi-desempenho'); const elReal=document.getElementById('kpi-real'); const elPlan=document.getElementById('kpi-planejado'); if(!rows.length){ elPerf.textContent=elReal.textContent=elPlan.textContent='n/d'; drawGauge(0); return; } const vals=rows.filter(r=>r.__real!=null && r.__plan!=null && r.__plan!==0); if(!vals.length){ elPerf.textContent=elReal.textContent=elPlan.textContent='n/d'; drawGauge(0); return; } const avgReal=vals.reduce((s,r)=>s+r.__real,0)/vals.length; const avgPlan=vals.reduce((s,r)=>s+r.__plan,0)/vals.length; const ratio=avgPlan? (avgReal/avgPlan) : 0; elReal.textContent=avgReal.toFixed(1)+'%'; elPlan.textContent=avgPlan.toFixed(1)+'%'; elPerf.textContent=(ratio*100).toFixed(1)+'%'; drawGauge(clamp01(ratio)); }
-    function drawGauge(t){ const needle=document.getElementById('gauge-needle'); const label=document.getElementById('gauge-label'); const angle=180+(0-180)*t; needle.setAttribute('transform',`rotate(${angle} 100 100)`); label.textContent=Math.round(t*100)+'%'; }
-
-    function init3D(){ const c=document.getElementById('canvas3d'); 
-      const sceneBg = 0xf7f8fb;
-      scene=new THREE.Scene(); scene.background=new THREE.Color(sceneBg);
-      const W=c.clientWidth,H=c.clientHeight;
-      camera=new THREE.PerspectiveCamera(55,W/H,0.1,10000); camera.position.set(200,200,200);
-      renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(W,H);
-      c.innerHTML=''; c.appendChild(renderer.domElement);
-      const hemi=new THREE.HemisphereLight(0xffffff,0x444466,0.8); scene.add(hemi);
-      const dir=new THREE.DirectionalLight(0xffffff,0.8); dir.position.set(200,300,400); scene.add(dir);
-      controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true;
-      scene.add(new THREE.GridHelper(400,10,0xccccff,0xeeeeff));
-      const axes=new THREE.AxesHelper(120); axes.material.depthTest=false; axes.renderOrder=2; scene.add(axes);
-      window.addEventListener('resize',onResize); animate();
-    }
-    function onResize(){ const c=document.getElementById('canvas3d'); if(!c) return; const W=c.clientWidth,H=c.clientHeight; camera.aspect=W/H; camera.updateProjectionMatrix(); renderer.setSize(W,H); }
-    function animate(){ requestAnimationFrame(animate); if(controls) controls.update(); if(renderer && scene && camera) renderer.render(scene,camera); }
-
-    function drawPoints(rows){
-      if(pointsMesh){ scene.remove(pointsMesh); pointsMesh.geometry.dispose(); pointsMesh.material.dispose(); pointsMesh=null; }
-      if(!rows.length) return;
-      const xs=rows.map(r=>r.__x), ys=rows.map(r=>r.__y), zs=rows.map(r=>r.__z);
-      const min=a=>a.reduce((m,v)=>v<m?v:m,a[0]);
-      const max=a=>a.reduce((m,v)=>v>m?v:m,a[0]);
-      const minX=min(xs), maxX=max(xs), minY=min(ys), maxY=max(ys), minZ=min(zs), maxZ=max(zs);
-      const span=n=> (n==0?1:n);
-      const spanX=span(maxX-minX), spanY=span(maxY-minY), spanZ=span(maxZ-minZ);
-      const positions=[], colors=[];
-      rows.forEach(r=>{
-        const {__x:x0,__y:y0,__z:z0,__real:real,__plan:plan}=r;
-        if(![x0,y0,z0].every(v=>Number.isFinite(v)) || plan==null || plan===0) return;
-        const x=((x0-minX)/spanX-0.5)*200;
-        const y=((y0-minY)/spanY-0.5)*200;
-        const z=((z0-minZ)/spanZ-0.5)*200;
-        positions.push(x,y,z);
-        const c=ratioColor((real??0)/plan);
-        colors.push(c.r,c.g,c.b);
-      });
-      const geom=new THREE.BufferGeometry();
-      geom.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(positions),3));
-      geom.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(colors),3));
-      const mat=new THREE.PointsMaterial({size:6,vertexColors:true,opacity:.95,transparent:true});
-      pointsMesh=new THREE.Points(geom,mat);
-      scene.add(pointsMesh);
-    }
-
-    function applyFilters(){
-      const d=document.getElementById('filter-data').value;
-      const a=document.getElementById('filter-area').value;
-      filteredRows=allRows.filter(r=> (d==='*' || r.__dateKey===d) && (a==='*' || r.__area===a) );
-      updateKPIs(filteredRows);
-      drawPoints(filteredRows);
-    }
-
-    async function boot(){
-      init3D();
-      try{
-        const raw = await loadExcelSmart();
-        allRows = preprocessRows(raw);
-        populateFilters(allRows);
-        applyFilters();
-      }catch(err){
-        console.error(err);
-        const el=document.getElementById('data-error');
-        if(el) el.textContent='Falha ao carregar o Excel: '+(err.message ?? err);
-      }
-      document.getElementById('filter-data').addEventListener('change', applyFilters);
-      document.getElementById('filter-area').addEventListener('change', applyFilters);
-      document.getElementById('btn-full').addEventListener('click', ()=>{
-        const card=document.getElementById('card-3d');
-        if(!document.fullscreenElement) card.requestFullscreen?.();
-        else document.exitFullscreen?.();
-        setTimeout(onResize,300);
-      });
-    }
-    return { boot };
-  }
-
-  const app = createApp();
-  window.addEventListener('DOMContentLoaded', app.boot);
-</script>
+  });
+  </script>
 </body>
 </html>
