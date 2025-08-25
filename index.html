@@ -1,41 +1,71 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Teste Excel</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Modelo3D – Dashboard (v4)</title>
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <style>
+    :root{ --fg:#1f2328; --muted:#57606a; --bg:#fff; --card:#f6f8fa; --ok:#1a7f37; --warn:#bf8700; }
+    *{box-sizing:border-box}
+    body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:24px; color:var(--fg); background:var(--bg)}
+    h1{margin:0 0 8px 0}
+    .muted{color:var(--muted)}
+    .toolbar{display:flex; gap:8px; align-items:center; margin:12px 0 20px}
+    button{padding:8px 12px; border:1px solid #d0d7de; background:#fff; border-radius:6px; cursor:pointer}
+    button:hover{background:#f6f8fa}
+    .grid{display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:12px}
+    .card{background:var(--card); border:1px solid #d0d7de; border-radius:10px; padding:12px}
+    .kpi-label{font-size:12px; color:var(--muted)}
+    .kpi-value{font-size:28px; font-weight:700}
+    canvas{background:#fff; border:1px solid #e6ebf1; border-radius:8px}
+    pre{white-space:pre-wrap; border:1px solid #e6ebf1; border-radius:8px; padding:12px; background:#fff; max-height:30vh; overflow:auto}
+  </style>
 </head>
 <body>
-  <h1>Teste de Leitura de Excel</h1>
-  <button id="btn">Carregar Excel</button>
-  <pre id="log"></pre>
+  <h1>Modelo3D – Dashboard</h1>
+  <div class="muted">Base: <code>data/Base 3.xlsx</code></div>
 
-  <!-- XLSX sem SRI -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
-          crossorigin="anonymous"
-          defer></script>
+  <div class="toolbar">
+    <button id="btnReload">Recarregar</button>
+    <span id="status" class="muted">Aguardando…</span>
+  </div>
 
-  <!-- Loader -->
+  <section class="grid" style="margin-bottom:16px">
+    <div class="card">
+      <div class="kpi-label">Empregados Diretos (Total)</div>
+      <div class="kpi-value" id="kpiDir">–</div>
+    </div>
+    <div class="card">
+      <div class="kpi-label">Empregados Indiretos (Total)</div>
+      <div class="kpi-value" id="kpiInd">–</div>
+    </div>
+    <div class="card">
+      <div class="kpi-label">Custo por frente (Média)</div>
+      <div class="kpi-value" id="kpiCusto">–</div>
+    </div>
+    <div class="card">
+      <div class="kpi-label">Áreas com Evolução (Sim)</div>
+      <div class="kpi-value" id="kpiEvo">–</div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:16px">
+    <h3 style="margin-top:0">Previsto vs Real por Área</h3>
+    <canvas id="chartPR" height="140"></canvas>
+  </section>
+
+  <details class="card">
+    <summary>Preview das primeiras linhas</summary>
+    <pre id="log"></pre>
+  </details>
+
+  <!-- Bibliotecas: XLSX e Chart.js (sem SRI) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous" defer></script>
+
+  <!-- Utilitários de carregamento e dashboard -->
   <script src="js/loadExcel.js" defer></script>
-
-  <script>
-    const log = (msg)=>{ const el = document.getElementById('log'); el.textContent += msg + "\n"; console.log(msg); };
-
-    document.getElementById('btn').addEventListener('click', async ()=>{
-      log('Iniciando leitura do Excel…');
-      try{
-        const wb = await loadExcelSmart({
-          relativePath: 'data/Base.xlsx',
-          cacheBust: true
-        });
-        log('Workbook carregado com sucesso. Abas: ' + wb.SheetNames.join(', '));
-        const first = wb.SheetNames[0];
-        const json = XLSX.utils.sheet_to_json(wb.Sheets[first]);
-        log('Primeiras linhas:');
-        log(JSON.stringify(json.slice(0,5), null, 2));
-      }catch(err){
-        log('Falha ao carregar: ' + err.message);
-      }
-    });
-  </script>
+  <script src="js/dashboard.js" defer></script>
 </body>
 </html>
