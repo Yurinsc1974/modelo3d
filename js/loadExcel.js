@@ -1,4 +1,4 @@
-// Utilitário robusto para GitHub Pages
+// Loader robusto para GitHub Pages (sem SRI)
 async function fetchArrayBuffer(url, opts={}){
   const res = await fetch(url, {cache: 'no-store', ...opts});
   if(!res.ok){

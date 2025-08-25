@@ -3,69 +3,104 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Modelo3D – Dashboard (v4)</title>
+  <title>Modelo3D – Dashboard + 4D (v5)</title>
   <meta http-equiv="Cache-Control" content="no-store" />
   <style>
-    :root{ --fg:#1f2328; --muted:#57606a; --bg:#fff; --card:#f6f8fa; --ok:#1a7f37; --warn:#bf8700; }
+    :root{ --fg:#1f2328; --muted:#57606a; --bg:#fff; --card:#f6f8fa; --ok:#1a7f37; --warn:#bf8700; --err:#d1242f; }
     *{box-sizing:border-box}
     body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:24px; color:var(--fg); background:var(--bg)}
     h1{margin:0 0 8px 0}
+    h2{margin:12px 0}
     .muted{color:var(--muted)}
-    .toolbar{display:flex; gap:8px; align-items:center; margin:12px 0 20px}
-    button{padding:8px 12px; border:1px solid #d0d7de; background:#fff; border-radius:6px; cursor:pointer}
-    button:hover{background:#f6f8fa}
-    .grid{display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:12px}
+    .toolbar{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:12px 0 20px}
     .card{background:var(--card); border:1px solid #d0d7de; border-radius:10px; padding:12px}
-    .kpi-label{font-size:12px; color:var(--muted)}
-    .kpi-value{font-size:28px; font-weight:700}
+    .grid{display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:12px}
+    label{font-size:12px; color:var(--muted); display:block; margin-bottom:4px}
+    select, input[type="date"], input[type="range"]{padding:6px 8px; border:1px solid #d0d7de; border-radius:6px}
+    button{padding:6px 10px; border:1px solid #d0d7de; background:#fff; border-radius:6px; cursor:pointer}
+    button:hover{background:#f6f8fa}
+    .kpi{display:flex; flex-direction:column; gap:4px}
+    .kpi .label{font-size:12px; color:var(--muted)}
+    .kpi .value{font-size:26px; font-weight:700}
     canvas{background:#fff; border:1px solid #e6ebf1; border-radius:8px}
-    pre{white-space:pre-wrap; border:1px solid #e6ebf1; border-radius:8px; padding:12px; background:#fff; max-height:30vh; overflow:auto}
+    #log{white-space:pre-wrap; border:1px solid #e6ebf1; border-radius:8px; padding:12px; background:#fff; max-height:28vh; overflow:auto}
+    .legend{display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted)}
+    .sw{width:10px; height:10px; border-radius:2px; display:inline-block; border:1px solid #c7ccd1}
+    #vis4d{width:100%; height:360px; background:#fff; border:1px solid #e6ebf1; border-radius:8px; position:relative;}
+    #tt{position:absolute; pointer-events:none; background:#111; color:#fff; font-size:12px; padding:6px 8px; border-radius:6px; opacity:0; transform:translate(-50%,-120%); white-space:nowrap}
+    .row{display:flex; gap:12px; flex-wrap:wrap}
   </style>
 </head>
 <body>
-  <h1>Modelo3D – Dashboard</h1>
-  <div class="muted">Base: <code>data/Base 3.xlsx</code></div>
+  <h1>Modelo3D – Dashboard + 4D</h1>
+  <div class="muted">Base: <code>data/Base 3.xlsx</code> (pode alterar em <code>js/loadExcel.js</code>)</div>
 
-  <div class="toolbar">
-    <button id="btnReload">Recarregar</button>
-    <span id="status" class="muted">Aguardando…</span>
+  <div class="toolbar card">
+    <div>
+      <label for="selArea">Filtro: Área</label>
+      <select id="selArea" multiple size="4" style="min-width:220px"></select>
+    </div>
+    <div>
+      <label for="selData">Filtro: Data (ou Marco)</label>
+      <select id="selData" style="min-width:180px"></select>
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <button id="btnClear">Limpar filtros</button>
+      <button id="btnReload">Recarregar</button>
+    </div>
   </div>
 
-  <section class="grid" style="margin-bottom:16px">
-    <div class="card">
-      <div class="kpi-label">Empregados Diretos (Total)</div>
-      <div class="kpi-value" id="kpiDir">–</div>
-    </div>
-    <div class="card">
-      <div class="kpi-label">Empregados Indiretos (Total)</div>
-      <div class="kpi-value" id="kpiInd">–</div>
-    </div>
-    <div class="card">
-      <div class="kpi-label">Custo por frente (Média)</div>
-      <div class="kpi-value" id="kpiCusto">–</div>
-    </div>
-    <div class="card">
-      <div class="kpi-label">Áreas com Evolução (Sim)</div>
-      <div class="kpi-value" id="kpiEvo">–</div>
-    </div>
-  </section>
+  <div class="grid">
+    <section class="card">
+      <h2 style="margin-top:0">Card 4D – Simulação por Área</h2>
+      <div class="row" style="align-items:center">
+        <div class="legend">
+          <span class="sw" style="background:#54aeff"></span> Previsto
+          <span class="sw" style="background:#2da44e"></span> Real
+          <span class="sw" style="background:#c297ff"></span> Masterplan
+          <span class="sw" style="background:#ffd966"></span> Atraso
+        </div>
+        <div style="margin-left:auto; display:flex; gap:8px; align-items:center">
+          <button id="btnPlay">▶️ Play</button>
+          <input id="rngStep" type="range" min="0" max="0" step="1" value="0" />
+          <span id="lblStep" class="muted">–</span>
+        </div>
+      </div>
+      <div id="vis4d">
+        <div id="tt"></div>
+        <!-- SVG é injetado via vis4d.js -->
+      </div>
+    </section>
 
-  <section class="card" style="margin-bottom:16px">
-    <h3 style="margin-top:0">Previsto vs Real por Área</h3>
-    <canvas id="chartPR" height="140"></canvas>
-  </section>
+    <section class="card">
+      <h2 style="margin-top:0">Gráfico 1 – Previsto x Real x Masterplan</h2>
+      <canvas id="chartPRM" height="220"></canvas>
+    </section>
 
-  <details class="card">
-    <summary>Preview das primeiras linhas</summary>
-    <pre id="log"></pre>
-  </details>
+    <section class="card">
+      <h2 style="margin-top:0">Gráfico 2 – Proposta Gerencial: Curva S (Cumulativa)</h2>
+      <canvas id="chartCurvaS" height="220"></canvas>
+    </section>
+
+    <section class="card">
+      <h2 style="margin-top:0">Gráfico 3 – Proposta Gerencial: Desvio vs Custo</h2>
+      <canvas id="chartDesvioCusto" height="220"></canvas>
+    </section>
+
+    <section class="card">
+      <h2 style="margin-top:0">Preview (debug)</h2>
+      <pre id="log">Aguardando…</pre>
+    </section>
+  </div>
 
   <!-- Bibliotecas: XLSX e Chart.js (sem SRI) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous" defer></script>
 
-  <!-- Utilitários de carregamento e dashboard -->
+  <!-- Scripts -->
   <script src="js/loadExcel.js" defer></script>
+  <script src="js/vis4d.js" defer></script>
   <script src="js/dashboard.js" defer></script>
 </body>
 </html>
